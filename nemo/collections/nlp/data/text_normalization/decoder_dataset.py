@@ -112,11 +112,11 @@ class TextNormalizationDecoderDataset(Dataset):
             if initial_shuffle:
                 random.shuffle(raw_instances)
 
-            logging.debug(f"Converting raw instances to DecoderDataInstance for {input_file}...")
+            logging.info(f"Converting raw instances to DecoderDataInstance for {input_file}...")
             self.insts, all_semiotic_classes = self.__process_raw_entries(
                 raw_instances, decoder_data_augmentation=decoder_data_augmentation
             )
-            logging.debug(
+            logging.info(
                 f"Extracted {len(self.insts)} DecoderDateInstances out of {len(raw_instances)} raw instances."
             )
             self.label_ids_semiotic = OrderedDict({l: idx for idx, l in enumerate(all_semiotic_classes)})

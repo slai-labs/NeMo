@@ -9,7 +9,7 @@ LANGUAGE='en' # 'en', 'ru', 'other'
 MIN_SEGMENT_LEN=10
 MAX_SEGMENT_LEN=30 #0
 ADDITIONAL_SPLIT_SYMBOLS=":|;|,"
-USE_NEMO_NORMALIZATION='False'
+USE_NEMO_NORMALIZATION='True'
 REMOVE_TEXT_IN_BRACKETS='{}()[]'
 
 FOLDER="de"
@@ -30,7 +30,7 @@ OUTPUT_DIR="output_segmentation"
 # Benchmarking
 FOLDER="" #"del"
 DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
-MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25"
+MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_conformer_ctc_small" #"stt_en_citrinet_512_gamma_0_25"
 OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}_nemo_${MODEL_NAME_OR_PATH}"
 
 rm -rf ${OUTPUT_DIR}
