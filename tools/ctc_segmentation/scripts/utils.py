@@ -106,41 +106,34 @@ def get_segments(
         f"Text length {os.path.basename(transcript_file)}: {len(ground_truth_mat)}"
     )
 
-    def _compute_time(index, align_type):
-        """Compute start and end time of utterance.
-        :param index:  frame index value
-        :param align_type:  one of ["begin", "end"]
-        :return: start/end time of utterance in seconds
-        """
-        middle = (timings[index] + timings[index - 1]) / 2
-        if align_type == "begin":
-            return max(timings[index + 1] - 0.5, middle)
-        elif align_type == "end":
-            return min(timings[index - 1] + 0.5, middle)
-
     try:
         timings, char_probs, char_list = cs.ctc_segmentation(config, log_probs, ground_truth_mat)
         segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
 
+        """
+        # WIP to split long audio segments after initial segmentation
         # extract char_probs for segment of interest
         seg_id = 3
-
-        start = _compute_time(utt_begin_indices[seg_id], "begin")
-        end = _compute_time(utt_begin_indices[seg_id + 1], "end")
+        seg_id_start = utt_begin_indices[seg_id] - 1
+        seg_id_end = utt_begin_indices[seg_id + 1]
+        start = _compute_time(seg_id_start, "begin", timings)
+        end = _compute_time(seg_id_end, "end", timings)
         start_t = int(round(start / config.index_duration_in_seconds))
         end_t = int(round(end / config.index_duration_in_seconds))
         utterance = char_list[start_t: end_t]
         char_probs_seg = char_probs[start_t: end_t]
-        utt_begin_indices_seg = [3, 44, 18]
 
-        # get
-        timings_seg = timings[utt_begin_indices[seg_id]: utt_begin_indices[seg_id+1]]
+        text_seg = ["under the protection of a passenger", "and a trusty dog"]
+        timings_seg = timings[seg_id_start: seg_id_end]
+        utt_begin_indices_seg = [1, 11, timings_seg.shape[0] - 1]
         blank_spans = _get_blank_spans(utterance)
+        ground_truth_mat_seg = ground_truth_mat[seg_id_start: seg_id_end]
         # sort by the blank count
         blank_spans = sorted(blank_spans, key=lambda x: x[2], reverse=True)
-        import pdb;
-        pdb.set_trace()
-        segments_short = cs.determine_utterance_segments(config, utt_begin_indices_seg, char_probs_seg, timings_seg, text[seg_id])
+
+        segments_short = cs.determine_utterance_segments(config, utt_begin_indices_seg, char_probs, timings_seg, text_seg)
+        print(segments_short)
+        print()
         print(utterance)
         print(blank_spans)
 
@@ -148,12 +141,30 @@ def get_segments(
         #     if i < 10:
         #         print(f"{segment[0]:.2f} {segment[1]:.2f} {segment[2]:3.4f} {word}")
 
+
+        segments[seg_id] = segments_short
+        text[seg_id] = text_seg
+        text_normalized[seg_id] = text_seg
+        text_no_preprocessing[seg_id] = text_seg
+        """
+
         write_output(output_file, path_wav, segments, text, text_no_preprocessing, text_normalized)
 
     except Exception as e:
         logging.info(e)
         logging.info(f"segmentation of {transcript_file} failed")
 
+def _compute_time(index, align_type, timings):
+    """Compute start and end time of utterance.
+    :param index:  frame index value
+    :param align_type:  one of ["begin", "end"]
+    :return: start/end time of utterance in seconds
+    """
+    middle = (timings[index] + timings[index - 1]) / 2
+    if align_type == "begin":
+        return max(timings[index + 1] - 0.5, middle)
+    elif align_type == "end":
+        return min(timings[index - 1] + 0.5, middle)
 
 def _print(ground_truth_mat, vocabulary):
     chars = []
@@ -215,14 +226,19 @@ def write_output(
     with open(str(out_path), "w") as outfile:
         outfile.write(str(path_wav) + "\n")
 
-        for i, (start, end, score) in enumerate(segments):
-            outfile.write(
-                f'{start} {end} {score} | {text[i]} | {text_no_preprocessing[i]} | {text_normalized[i]}\n'
-            )
-            # duration = end - start
-            # if duration > 20:
-            #     import pdb; pdb.set_trace()
-            #     print()
+        for i, segment in enumerate(segments):
+            if isinstance(segment, list):
+                for j, x in enumerate(segment):
+                    start, end, score = x
+                    score = -0.2
+                    outfile.write(
+                        f'{start} {end} {score} | {text[i][j]} | {text_no_preprocessing[i][j]} | {text_normalized[i][j]}\n'
+                    )
+            else:
+                start, end, score = segment
+                outfile.write(
+                    f'{start} {end} {score} | {text[i]} | {text_no_preprocessing[i]} | {text_normalized[i]}\n'
+                )
 
 
 #####################
