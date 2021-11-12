@@ -220,6 +220,10 @@ def split_text(
         def _split(sentences, delimiter):
             result = []
             for sent in sentences:
+                # if ":" in delimiter and "Nar" in sent:
+                #     print(sent)
+                #     import pdb; pdb.set_trace()
+                #     print()
                 split_sent = sent.split(delimiter)
                 # keep the delimiter
                 split_sent = [(s + delimiter).strip() for s in split_sent[:-1]] + [split_sent[-1]]
@@ -289,8 +293,12 @@ def split_text(
     all_sentences = []
     for sent in sentences:
         sent = sent.split()
-        for i in range(0, len(sent), max_length):
-            all_sentences.append(" ".join(sent[i: i+max_length]))
+        # allow a few extra words to avoid too short sentences
+        if len(sent) < max_length * 5:
+            all_sentences.append(" ".join(sent))
+        else:
+            for i in range(0, len(sent), max_length):
+                all_sentences.append(" ".join(sent[i: i+max_length]))
     sentences = all_sentences
     del all_sentences
 
@@ -312,8 +320,8 @@ def split_text(
             raise ValueError(f'NeMo normalization tool is not installed.')
 
         print('Using NeMo normalization tool...')
-        normalizer = Normalizer(input_case='cased')
-        sentences_norm = normalizer.normalize_list(sentences, verbose=False)
+        normalizer = Normalizer(input_case='cased', cache_dir=os.path.join(os.path.dirname(out_file), 'en_grammars'))
+        sentences_norm = normalizer.normalize_list(sentences, verbose=False, punct_post_process=True)
         if len(sentences_norm) != len(sentences):
             raise ValueError(f'Normalization failed, number of sentences does not match.')
 

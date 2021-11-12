@@ -25,15 +25,15 @@ from nemo.collections.common.tokenizers.sentencepiece_tokenizer import SentenceP
 
 
 def get_segments(
-    log_probs: np.ndarray,
-    path_wav: Union[PosixPath, str],
-    transcript_file: Union[PosixPath, str],
-    output_file: str,
-    vocabulary: List[str],
-    tokenizer: SentencePieceTokenizer,
-    asr_model_name: str,
-    index_duration: float,
-    window_size: int = 8000,
+        log_probs: np.ndarray,
+        path_wav: Union[PosixPath, str],
+        transcript_file: Union[PosixPath, str],
+        output_file: str,
+        vocabulary: List[str],
+        tokenizer: SentencePieceTokenizer,
+        asr_model_name: str,
+        index_duration: float,
+        window_size: int = 8000,
 ) -> None:
     """
     Segments the audio into segments and saves segments timings to a file
@@ -53,7 +53,7 @@ def get_segments(
     config = cs.CtcSegmentationParameters()
     config.char_list = vocabulary
     config.min_window_size = window_size
-    config.index_duration = index_duration # 0.0799983368347339
+    config.index_duration = index_duration  # 0.0799983368347339
     config.blank = len(vocabulary) - 1
     # config.space = "▁"
 
@@ -85,7 +85,6 @@ def get_segments(
     if len(text_normalized) != len(text):
         raise ValueError(f'{transcript_file} and {transcript_file_normalized} do not match')
 
-
     # works for sentences CitriNet
     from prepare_bpe import prepare_tokenized_text_nemo_works_modified
     ground_truth_mat, utt_begin_indices = prepare_tokenized_text_nemo_works_modified(text, tokenizer, vocabulary)
@@ -107,9 +106,43 @@ def get_segments(
         f"Text length {os.path.basename(transcript_file)}: {len(ground_truth_mat)}"
     )
 
+    def _compute_time(index, align_type):
+        """Compute start and end time of utterance.
+        :param index:  frame index value
+        :param align_type:  one of ["begin", "end"]
+        :return: start/end time of utterance in seconds
+        """
+        middle = (timings[index] + timings[index - 1]) / 2
+        if align_type == "begin":
+            return max(timings[index + 1] - 0.5, middle)
+        elif align_type == "end":
+            return min(timings[index - 1] + 0.5, middle)
+
     try:
         timings, char_probs, char_list = cs.ctc_segmentation(config, log_probs, ground_truth_mat)
         segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
+
+        # extract char_probs for segment of interest
+        seg_id = 3
+
+        start = _compute_time(utt_begin_indices[seg_id], "begin")
+        end = _compute_time(utt_begin_indices[seg_id + 1], "end")
+        start_t = int(round(start / config.index_duration_in_seconds))
+        end_t = int(round(end / config.index_duration_in_seconds))
+        utterance = char_list[start_t: end_t]
+        char_probs_seg = char_probs[start_t: end_t]
+        utt_begin_indices_seg = [3, 44, 18]
+
+        # get
+        timings_seg = timings[utt_begin_indices[seg_id]: utt_begin_indices[seg_id+1]]
+        blank_spans = _get_blank_spans(utterance)
+        # sort by the blank count
+        blank_spans = sorted(blank_spans, key=lambda x: x[2], reverse=True)
+        import pdb;
+        pdb.set_trace()
+        segments_short = cs.determine_utterance_segments(config, utt_begin_indices_seg, char_probs_seg, timings_seg, text[seg_id])
+        print(utterance)
+        print(blank_spans)
 
         # for i, (word, segment) in enumerate(zip(text, segments)):
         #     if i < 10:
@@ -133,13 +166,40 @@ def _print(ground_truth_mat, vocabulary):
     [print(x) for x in chars[:100]]
 
 
+def _get_blank_spans(char_list, blank='ε'):
+    """
+    Returns a list of tuples:
+        (start index, end index (exclusive), count)
+
+    ignores blank symbols at the beginning and end of the char_list
+    since they're not suitable for split in between
+    """
+    blanks = []
+    start = None
+    end = None
+    for i, ch in enumerate(char_list):
+        if ch == blank:
+            if start is None:
+                start, end = i, i
+            else:
+                end = i
+        else:
+            if start is not None:
+                # ignore blank tokens at the beginning
+                if start > 0:
+                    end += 1
+                    blanks.append((start, end, end - start))
+                start = None
+                end = None
+    return blanks
+
 def write_output(
-    out_path: str,
-    path_wav: str,
-    segments: List[Tuple[float]],
-    text: str,
-    text_no_preprocessing: str,
-    text_normalized: str
+        out_path: str,
+        path_wav: str,
+        segments: List[Tuple[float]],
+        text: str,
+        text_no_preprocessing: str,
+        text_normalized: str
 ):
     """
     Write the segmentation output to a file
@@ -159,6 +219,10 @@ def write_output(
             outfile.write(
                 f'{start} {end} {score} | {text[i]} | {text_no_preprocessing[i]} | {text_normalized[i]}\n'
             )
+            # duration = end - start
+            # if duration > 20:
+            #     import pdb; pdb.set_trace()
+            #     print()
 
 
 #####################
@@ -202,11 +266,13 @@ def worker_configurer(queue, level):
 
 
 def worker_process(
-    queue, configurer, level, log_probs, path_wav, transcript_file, output_file, vocabulary, tokenizer, asr_model, index_duration, window_len
+        queue, configurer, level, log_probs, path_wav, transcript_file, output_file, vocabulary, tokenizer, asr_model,
+        index_duration, window_len
 ):
     configurer(queue, level)
     name = multiprocessing.current_process().name
     innerlogger = logging.getLogger('worker')
     innerlogger.info(f'{name} is processing {path_wav}, window_len={window_len}')
-    get_segments(log_probs, path_wav, transcript_file, output_file, vocabulary, tokenizer, asr_model, index_duration, window_len)
+    get_segments(log_probs, path_wav, transcript_file, output_file, vocabulary, tokenizer, asr_model, index_duration,
+                 window_len)
     innerlogger.info(f'{name} completed segmentation of {path_wav}, segments saved to {output_file}')

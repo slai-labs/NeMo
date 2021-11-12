@@ -128,6 +128,8 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             print(f"Skipping {path_audio.name}")
+            import pdb; pdb.set_trace()
+            print()
             continue
 
         all_log_probs.append(log_probs)

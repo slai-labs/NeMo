@@ -90,7 +90,7 @@ class Normalizer:
             self.processor = None
             print("NeMo NLP is not available. Moses de-tokenization will be skipped.")
 
-    def normalize_list(self, texts: List[str], verbose=False) -> List[str]:
+    def normalize_list(self, texts: List[str], verbose=False, punct_pre_process: bool = False, punct_post_process: bool = False) -> List[str]:
         """
         NeMo text normalizer 
 
@@ -103,7 +103,7 @@ class Normalizer:
         res = []
         for input in tqdm(texts):
             try:
-                text = self.normalize(input, verbose=verbose)
+                text = self.normalize(input, verbose=verbose, punct_pre_process=punct_pre_process, punct_post_process=punct_post_process)
             except:
                 print(input)
                 raise Exception

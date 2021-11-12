@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # default values for optional arguments
-MIN_SCORE=-10
+MIN_SCORE=-2
 CUT_PREFIX=0
 SCRIPTS_DIR="scripts"
 OFFSET=0
@@ -27,13 +27,13 @@ OUTPUT_DIR="output_segmentation"
 #MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #stt_en_citrinet_256 # "QuartzNet15x5Base-En" #
 #OUTPUT_DIR="/mnt/sdb/DATA/youtube_mayank/YT/out_${MODEL_NAME_OR_PATH}_2"
 
-# Benchmarking
-FOLDER="" #"del"
-DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
-MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_conformer_ctc_small" #"stt_en_citrinet_512_gamma_0_25"
-OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}_nemo_${MODEL_NAME_OR_PATH}"
+## Benchmarking
+#FOLDER="" #"del"
+#DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
+#MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #"QuartzNet15x5Base-En" #"stt_en_conformer_ctc_small" #
+#OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}_nemo_${MODEL_NAME_OR_PATH}"
 
-rm -rf ${OUTPUT_DIR}
+#rm -rf ${OUTPUT_DIR}
 
 for ARG in "$@"
 do
@@ -86,16 +86,16 @@ NEMO_NORMALIZATION=""
 
 # STEP #1
 # Prepare text and audio data for segmentation
-python $SCRIPTS_DIR/prepare_data.py \
---in_text=$DATA_DIR/text \
---audio_dir=$DATA_DIR/audio \
---output_dir=$OUTPUT_DIR/processed/ \
---language=$LANGUAGE \
---cut_prefix=$CUT_PREFIX \
---model=$MODEL_NAME_OR_PATH \
---min_length=$MIN_SEGMENT_LEN \
---max_length=$MAX_SEGMENT_LEN \
---additional_split_symbols=$ADDITIONAL_SPLIT_SYMBOLS $NEMO_NORMALIZATION || exit
+#python $SCRIPTS_DIR/prepare_data.py \
+#--in_text=$DATA_DIR/text \
+#--audio_dir=$DATA_DIR/audio \
+#--output_dir=$OUTPUT_DIR/processed/ \
+#--language=$LANGUAGE \
+#--cut_prefix=$CUT_PREFIX \
+#--model=$MODEL_NAME_OR_PATH \
+#--min_length=$MIN_SEGMENT_LEN \
+#--max_length=$MAX_SEGMENT_LEN \
+#--additional_split_symbols=$ADDITIONAL_SPLIT_SYMBOLS $NEMO_NORMALIZATION || exit
 
 # STEP #2
 # Run CTC-segmentation
@@ -108,7 +108,8 @@ do
   --output_dir=$OUTPUT_DIR \
   --data=$OUTPUT_DIR/processed/ \
   --model=$MODEL_NAME_OR_PATH  \
-  --window_len $WINDOW || exit
+  --window_len $WINDOW \
+  --no_parallel || exit
 done
 
 # STEP #3 (Optional)
@@ -155,3 +156,11 @@ python /home/ebakhturina/NeMo/tools/speech_data_explorer/data_explorer.py \
 --port 8055 \
 ${OUTPUT_DIR}/manifests/transcribed.json
 
+# clean up
+# remove del folder, processed folder
+
+# add filtering based on cer/wer and edge cer
+
+# tail calculations
+
+# to do conforer partition
