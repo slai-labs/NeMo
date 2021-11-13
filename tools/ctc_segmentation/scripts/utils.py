@@ -18,6 +18,7 @@ import multiprocessing
 import os
 from pathlib import PosixPath
 from typing import List, Tuple, Union
+import math
 
 import ctc_segmentation as cs
 import numpy as np
@@ -88,7 +89,6 @@ def get_segments(
     # works for sentences CitriNet
     from prepare_bpe import prepare_tokenized_text_nemo_works_modified
     ground_truth_mat, utt_begin_indices = prepare_tokenized_text_nemo_works_modified(text, tokenizer, vocabulary)
-    # _print(ground_truth_mat, vocabulary)
 
     """
     # QN
@@ -108,7 +108,8 @@ def get_segments(
 
     try:
         timings, char_probs, char_list = cs.ctc_segmentation(config, log_probs, ground_truth_mat)
-        segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
+        _print(ground_truth_mat, vocabulary)
+        segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
 
         """
         # WIP to split long audio segments after initial segmentation
@@ -137,11 +138,6 @@ def get_segments(
         print(utterance)
         print(blank_spans)
 
-        # for i, (word, segment) in enumerate(zip(text, segments)):
-        #     if i < 10:
-        #         print(f"{segment[0]:.2f} {segment[1]:.2f} {segment[2]:3.4f} {word}")
-
-
         segments[seg_id] = segments_short
         text[seg_id] = text_seg
         text_normalized[seg_id] = text_seg
@@ -149,6 +145,9 @@ def get_segments(
         """
 
         write_output(output_file, path_wav, segments, text, text_no_preprocessing, text_normalized)
+        for i, (word, segment) in enumerate(zip(text, segments)):
+            if i < 10:
+                print(f"{segment[0]:.2f} {segment[1]:.2f} {segment[2]:3.4f} {word}")
 
     except Exception as e:
         logging.info(e)
@@ -239,6 +238,57 @@ def write_output(
                 outfile.write(
                     f'{start} {end} {score} | {text[i]} | {text_no_preprocessing[i]} | {text_normalized[i]}\n'
                 )
+
+
+def determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list):
+    """Utterance-wise alignments from char-wise alignments.
+    Adapted from https://github.com/lumaku/ctc-segmentation
+    :param config: an instance of CtcSegmentationParameters
+    :param utt_begin_indices: list of time indices of utterance start
+    :param char_probs:  character positioned probabilities obtained from backtracking
+    :param timings: mapping of time indices to seconds
+    :param text: list of utterances
+    :return: segments, a list of: utterance start and end [s], and its confidence score
+    """
+    segments = []
+    min_prob = np.float64(-10000000000.0)
+    for i in range(len(text)):
+        start = _compute_time(utt_begin_indices[i], "begin", timings)
+        end = _compute_time(utt_begin_indices[i + 1], "end", timings)
+
+        start_t = start / config.index_duration_in_seconds
+        start_t_floor = math.floor(start_t)
+
+        # look for the left most blank symbol and split in the middle to fix start utterance segmentation
+        if char_list[start_t_floor] == config.char_list[config.blank]:
+            start_blank = None
+            j = start_t_floor - 1
+            while char_list[j] == config.char_list[config.blank] and j > start_t_floor - 20:
+                start_blank = j
+                j -= 1
+            if start_blank:
+                start_t = int(round(start_blank + (start_t_floor - start_blank)/2))
+            else:
+                start_t = start_t_floor
+            start = start_t * config.index_duration_in_seconds
+
+        else:
+            start_t = int(round(start_t))
+
+        end_t = int(round(end / config.index_duration_in_seconds))
+
+        # Compute confidence score by using the min mean probability after splitting into segments of L frames
+        n = config.score_min_mean_over_L
+        if end_t <= start_t:
+            min_avg = min_prob
+        elif end_t - start_t <= n:
+            min_avg = char_probs[start_t:end_t].mean()
+        else:
+            min_avg = np.float64(0.0)
+            for t in range(start_t, end_t - n):
+                min_avg = min(min_avg, char_probs[t : t + n].mean())
+        segments.append((start, end, min_avg))
+    return segments
 
 
 #####################

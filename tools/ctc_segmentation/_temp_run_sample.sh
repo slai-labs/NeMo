@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # default values for optional arguments
-MIN_SCORE=-2
+MIN_SCORE=-10
 CUT_PREFIX=0
 SCRIPTS_DIR="scripts"
 OFFSET=0
 LANGUAGE='en' # 'en', 'ru', 'other'
 MIN_SEGMENT_LEN=10
 MAX_SEGMENT_LEN=30 #0
-ADDITIONAL_SPLIT_SYMBOLS=":|;|,"
+ADDITIONAL_SPLIT_SYMBOLS=":|;"
 USE_NEMO_NORMALIZATION='True'
 REMOVE_TEXT_IN_BRACKETS='{}()[]'
 
@@ -84,8 +84,8 @@ NEMO_NORMALIZATION=""
       NEMO_NORMALIZATION="--use_nemo_normalization "
     fi
 
-# STEP #1
-# Prepare text and audio data for segmentation
+## STEP #1
+## Prepare text and audio data for segmentation
 #python $SCRIPTS_DIR/prepare_data.py \
 #--in_text=$DATA_DIR/text \
 #--audio_dir=$DATA_DIR/audio \
