@@ -74,10 +74,12 @@ if __name__ == '__main__':
                 f'Provide path to the pretrained checkpoint or choose from {nemo_asr.models.EncDecCTCModel.get_available_model_names()}'
             )
 
-    # get tokenizer used during training, None for Quartznet models
-    try:
+    bpe_model = isinstance(asr_model, nemo_asr.models.EncDecCTCModelBPE)
+
+    # get tokenizer used during training, None for char based models
+    if bpe_model:
         tokenizer = asr_model.tokenizer
-    except:
+    else:
         tokenizer = None
 
     # extract ASR vocabulary and add blank symbol
@@ -101,7 +103,7 @@ if __name__ == '__main__':
     segments_dir = os.path.join(args.output_dir, 'segments')
     os.makedirs(segments_dir, exist_ok=True)
     for path_audio in audio_paths:
-        print(f'Processing {path_audio.name}...')
+        logging.info(f'Processing {path_audio.name}...')
         transcript_file = os.path.join(data_dir, path_audio.name.replace(".wav", ".txt"))
         segment_file = os.path.join(
             segments_dir, f"{args.window_len}_" + path_audio.name.replace(".wav", "_segments.txt")
@@ -120,7 +122,7 @@ if __name__ == '__main__':
             raise
 
         original_duration = len(signal) / sample_rate
-        print(f'len(signal): {len(signal)}, sr: {sample_rate}')
+        logging.debug(f'len(signal): {len(signal)}, sr: {sample_rate}')
         logging.debug(f'Duration: {original_duration}s, file_name: {path_audio}')
         log_probs = None
         try:
@@ -128,8 +130,6 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             print(f"Skipping {path_audio.name}")
-            import pdb; pdb.set_trace()
-            print()
             continue
 
         all_log_probs.append(log_probs)
@@ -137,6 +137,7 @@ if __name__ == '__main__':
         all_transcript_file.append(str(transcript_file))
         all_wav_paths.append(path_audio)
 
+    asr_model_type = type(asr_model)
     del asr_model
     torch.cuda.empty_cache()
 
@@ -153,7 +154,7 @@ if __name__ == '__main__':
                 all_segment_file[i],
                 vocabulary,
                 tokenizer,
-                args.model,
+                bpe_model,
                 index_duration,
                 args.window_len,
             )
@@ -176,7 +177,7 @@ if __name__ == '__main__':
                     all_segment_file[i],
                     vocabulary,
                     tokenizer,
-                    args.model,
+                    bpe_model,
                     index_duration,
                     args.window_len,
                 ),

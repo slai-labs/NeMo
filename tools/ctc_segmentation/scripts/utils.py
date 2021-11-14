@@ -32,7 +32,7 @@ def get_segments(
         output_file: str,
         vocabulary: List[str],
         tokenizer: SentencePieceTokenizer,
-        asr_model_name: str,
+        bpe_model: bool,
         index_duration: float,
         window_size: int = 8000,
 ) -> None:
@@ -46,18 +46,11 @@ def get_segments(
         transcript_file: path to
         output_file: path to the file to save timings for segments
         vocabulary: vocabulary used to train the ASR model, note blank is at position len(vocabulary) - 1
-        tokenizer: ASR model tokenizer (for BPE models, None for Quartznet)
-        asr_model_name: name of the CTC-based ASR model
+        tokenizer: ASR model tokenizer (for BPE models, None for char-based models)
+        bpe_model: Indicates whether the model uses BPE
         window_size: the length of each utterance (in terms of frames of the CTC outputs) fits into that window.
         index_duration: corresponding time duration of one CTC output index (in seconds)
     """
-    config = cs.CtcSegmentationParameters()
-    config.char_list = vocabulary
-    config.min_window_size = window_size
-    config.index_duration = index_duration  # 0.0799983368347339
-    config.blank = len(vocabulary) - 1
-    # config.space = "▁"
-
     with open(transcript_file, "r") as f:
         text = f.readlines()
         text = [t.strip() for t in text if t.strip()]
@@ -86,19 +79,18 @@ def get_segments(
     if len(text_normalized) != len(text):
         raise ValueError(f'{transcript_file} and {transcript_file_normalized} do not match')
 
-    # works for sentences CitriNet
-    from prepare_bpe import prepare_tokenized_text_nemo_works_modified
-    ground_truth_mat, utt_begin_indices = prepare_tokenized_text_nemo_works_modified(text, tokenizer, vocabulary)
-
-    """
-    # QN
-    from prepare_bpe import prepare_text_default, get_config_qn
-    config = get_config_qn()
+    config = cs.CtcSegmentationParameters()
+    config.char_list = vocabulary
     config.min_window_size = window_size
-    config.index_duration = index_duration 
-    ground_truth_mat, utt_begin_indices = prepare_text_default(config, text)
-    _print(ground_truth_mat, config.char_list)
-    """
+    config.index_duration = index_duration
+    config.blank = len(vocabulary) - 1
+
+    if bpe_model:
+        ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
+    else:
+        config.space = " "
+        ground_truth_mat, utt_begin_indices = _prepare_text_default(config, text)
+        _print(ground_truth_mat, config.char_list)
 
     logging.debug(f"Syncing {transcript_file}")
     logging.debug(
@@ -153,17 +145,62 @@ def get_segments(
         logging.info(e)
         logging.info(f"segmentation of {transcript_file} failed")
 
-def _compute_time(index, align_type, timings):
-    """Compute start and end time of utterance.
-    :param index:  frame index value
-    :param align_type:  one of ["begin", "end"]
-    :return: start/end time of utterance in seconds
-    """
-    middle = (timings[index] + timings[index - 1]) / 2
-    if align_type == "begin":
-        return max(timings[index + 1] - 0.5, middle)
-    elif align_type == "end":
-        return min(timings[index - 1] + 0.5, middle)
+
+def _prepare_text_default(config, text):
+    ground_truth = config.start_of_ground_truth
+    utt_begin_indices = []
+    for utt in text:
+        # One space in-between
+        if not ground_truth.endswith(config.space):
+            ground_truth += config.space
+        # Start new utterance remember index
+        utt_begin_indices.append(len(ground_truth)-1)
+        # Add chars of utterance
+        for char in utt:
+            if char in config.char_list and char not in config.excluded_characters:
+                ground_truth += char
+            elif config.tokenized_meta_symbol + char in config.char_list:
+                ground_truth += char
+    # Add space to the end
+    if not ground_truth.endswith(config.space):
+        ground_truth += config.space
+
+    utt_begin_indices.append(len(ground_truth) - 1)
+    # Create matrix: time frame x number of letters the character symbol spans
+    max_char_len = 2
+    ground_truth_mat = np.ones([len(ground_truth), max_char_len], np.int64) * -1
+    for i in range(len(ground_truth)):
+        for s in range(max_char_len):
+            if i - s < 0:
+                continue
+            span = ground_truth[i - s : i + 1]
+
+            if span == config.space:
+                char_index = config.char_list.index(span)
+                ground_truth_mat[i, s] = char_index
+            if span in config.char_list:
+                char_index = config.char_list.index(span)
+                ground_truth_mat[i, s] = char_index
+    return ground_truth_mat, utt_begin_indices
+
+
+def _prepare_tokenized_text_for_bpe_model(text: List[str], tokenizer, vocabulary: List[str]):
+    """ Creates a transition matrix for BPE-based models"""
+    space_idx = vocabulary.index("▁")
+    blank_idx = len(vocabulary) - 1
+
+    ground_truth_mat = [[-1, -1]]
+    utt_begin_indices = []
+    for uttr in text:
+        ground_truth_mat += [[blank_idx, space_idx]]
+        utt_begin_indices.append(len(ground_truth_mat))
+        token_ids = tokenizer.text_to_ids(uttr)
+        ground_truth_mat += [[t, -1] for t in token_ids]
+
+    utt_begin_indices.append(len(ground_truth_mat))
+    ground_truth_mat += [[blank_idx, space_idx]]
+    ground_truth_mat = np.array(ground_truth_mat, np.int64)
+    return ground_truth_mat, utt_begin_indices
 
 def _print(ground_truth_mat, vocabulary):
     chars = []
@@ -203,6 +240,70 @@ def _get_blank_spans(char_list, blank='ε'):
                 end = None
     return blanks
 
+
+def _compute_time(index, align_type, timings):
+    """Compute start and end time of utterance.
+    :param index:  frame index value
+    :param align_type:  one of ["begin", "end"]
+    :return: start/end time of utterance in seconds
+    """
+    middle = (timings[index] + timings[index - 1]) / 2
+    if align_type == "begin":
+        return max(timings[index + 1] - 0.5, middle)
+    elif align_type == "end":
+        return min(timings[index - 1] + 0.5, middle)
+
+
+def determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list):
+    """Utterance-wise alignments from char-wise alignments.
+    Adapted from https://github.com/lumaku/ctc-segmentation
+    :param config: an instance of CtcSegmentationParameters
+    :param utt_begin_indices: list of time indices of utterance start
+    :param char_probs:  character positioned probabilities obtained from backtracking
+    :param timings: mapping of time indices to seconds
+    :param text: list of utterances
+    :return: segments, a list of: utterance start and end [s], and its confidence score
+    """
+    segments = []
+    min_prob = np.float64(-10000000000.0)
+    for i in range(len(text)):
+        start = _compute_time(utt_begin_indices[i], "begin", timings)
+        end = _compute_time(utt_begin_indices[i + 1], "end", timings)
+
+        start_t = start / config.index_duration_in_seconds
+        start_t_floor = math.floor(start_t)
+
+        # look for the left most blank symbol and split in the middle to fix start utterance segmentation
+        if False and char_list[start_t_floor] == config.char_list[config.blank]:
+            start_blank = None
+            j = start_t_floor - 1
+            while char_list[j] == config.char_list[config.blank] and j > start_t_floor - 20:
+                start_blank = j
+                j -= 1
+            if start_blank:
+                start_t = int(round(start_blank + (start_t_floor - start_blank) / 2))
+            else:
+                start_t = start_t_floor
+            start = start_t * config.index_duration_in_seconds
+
+        else:
+            start_t = int(round(start_t))
+
+        end_t = int(round(end / config.index_duration_in_seconds))
+
+        # Compute confidence score by using the min mean probability after splitting into segments of L frames
+        n = config.score_min_mean_over_L
+        if end_t <= start_t:
+            min_avg = min_prob
+        elif end_t - start_t <= n:
+            min_avg = char_probs[start_t:end_t].mean()
+        else:
+            min_avg = np.float64(0.0)
+            for t in range(start_t, end_t - n):
+                min_avg = min(min_avg, char_probs[t: t + n].mean())
+        segments.append((start, end, min_avg))
+    return segments
+
 def write_output(
         out_path: str,
         path_wav: str,
@@ -238,57 +339,6 @@ def write_output(
                 outfile.write(
                     f'{start} {end} {score} | {text[i]} | {text_no_preprocessing[i]} | {text_normalized[i]}\n'
                 )
-
-
-def determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list):
-    """Utterance-wise alignments from char-wise alignments.
-    Adapted from https://github.com/lumaku/ctc-segmentation
-    :param config: an instance of CtcSegmentationParameters
-    :param utt_begin_indices: list of time indices of utterance start
-    :param char_probs:  character positioned probabilities obtained from backtracking
-    :param timings: mapping of time indices to seconds
-    :param text: list of utterances
-    :return: segments, a list of: utterance start and end [s], and its confidence score
-    """
-    segments = []
-    min_prob = np.float64(-10000000000.0)
-    for i in range(len(text)):
-        start = _compute_time(utt_begin_indices[i], "begin", timings)
-        end = _compute_time(utt_begin_indices[i + 1], "end", timings)
-
-        start_t = start / config.index_duration_in_seconds
-        start_t_floor = math.floor(start_t)
-
-        # look for the left most blank symbol and split in the middle to fix start utterance segmentation
-        if char_list[start_t_floor] == config.char_list[config.blank]:
-            start_blank = None
-            j = start_t_floor - 1
-            while char_list[j] == config.char_list[config.blank] and j > start_t_floor - 20:
-                start_blank = j
-                j -= 1
-            if start_blank:
-                start_t = int(round(start_blank + (start_t_floor - start_blank)/2))
-            else:
-                start_t = start_t_floor
-            start = start_t * config.index_duration_in_seconds
-
-        else:
-            start_t = int(round(start_t))
-
-        end_t = int(round(end / config.index_duration_in_seconds))
-
-        # Compute confidence score by using the min mean probability after splitting into segments of L frames
-        n = config.score_min_mean_over_L
-        if end_t <= start_t:
-            min_avg = min_prob
-        elif end_t - start_t <= n:
-            min_avg = char_probs[start_t:end_t].mean()
-        else:
-            min_avg = np.float64(0.0)
-            for t in range(start_t, end_t - n):
-                min_avg = min(min_avg, char_probs[t : t + n].mean())
-        segments.append((start, end, min_avg))
-    return segments
 
 
 #####################

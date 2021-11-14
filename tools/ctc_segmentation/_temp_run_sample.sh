@@ -20,7 +20,7 @@ OUTPUT_DIR="/home/ebakhturina/data/segmentation/german/output"
 
 DATA_DIR="/home/ebakhturina/data/ctc_segmentation/eng"
 DATA_DIR="/home/ebakhturina/data/segmentation/test/data"
-MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #stt_en_citrinet_256  #
+MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #stt_en_citrinet_256  # "QuartzNet15x5Base-En" #
 OUTPUT_DIR="output_segmentation"
 
 #DATA_DIR="/mnt/sdb/DATA/youtube_mayank/YT/data"
