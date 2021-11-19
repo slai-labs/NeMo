@@ -14,7 +14,6 @@
 
 import argparse
 import logging
-import multiprocessing
 import os
 import sys
 import time
@@ -22,7 +21,9 @@ from pathlib import Path
 
 import scipy.io.wavfile as wav
 import torch
-from utils import get_segments, listener_configurer, listener_process, worker_configurer, worker_process
+from joblib import Parallel, delayed
+from tqdm import tqdm
+from utils import get_segments
 
 import nemo.collections.asr as nemo_asr
 
@@ -159,36 +160,51 @@ if __name__ == '__main__':
                 args.window_len,
             )
     else:
-        queue = multiprocessing.Queue(-1)
-
-        listener = multiprocessing.Process(target=listener_process, args=(queue, listener_configurer, log_file, level))
-        listener.start()
-        workers = []
-        for i in range(len(all_log_probs)):
-            worker = multiprocessing.Process(
-                target=worker_process,
-                args=(
-                    queue,
-                    worker_configurer,
-                    level,
-                    all_log_probs[i],
-                    all_wav_paths[i],
-                    all_transcript_file[i],
-                    all_segment_file[i],
-                    vocabulary,
-                    tokenizer,
-                    bpe_model,
-                    index_duration,
-                    args.window_len,
-                ),
+        normalized_lines = Parallel(n_jobs=-2)(
+            delayed(get_segments)(
+                all_log_probs[i],
+                all_wav_paths[i],
+                all_transcript_file[i],
+                all_segment_file[i],
+                vocabulary,
+                tokenizer,
+                bpe_model,
+                index_duration,
+                args.window_len,
             )
-            workers.append(worker)
-            worker.start()
-        for w in workers:
-            w.join()
-        queue.put_nowait(None)
-        listener.join()
-
+            for i in tqdm(range(len(all_log_probs)))
+        )
+    #
+    #     import multiprocessing
+    #     queue = multiprocessing.Queue(-1)
+    #     listener = multiprocessing.Process(target=listener_process, args=(queue, listener_configurer, log_file, level))
+    #     listener.start()
+    #     workers = []
+    #     for i in range(len(all_log_probs)):
+    #         worker = multiprocessing.Process(
+    #             target=worker_process,
+    #             args=(
+    #                 queue,
+    #                 worker_configurer,
+    #                 level,
+    #                 all_log_probs[i],
+    #                 all_wav_paths[i],
+    #                 all_transcript_file[i],
+    #                 all_segment_file[i],
+    #                 vocabulary,
+    #                 tokenizer,
+    #                 bpe_model,
+    #                 index_duration,
+    #                 args.window_len,
+    #             ),
+    #         )
+    #         workers.append(worker)
+    #         worker.start()
+    #     for w in workers:
+    #         w.join()
+    #     queue.put_nowait(None)
+    #     listener.join()
+    #
     total_time = time.time() - start_time
     logger.info(f'Total execution time: ~{round(total_time/60)}min')
     logger.info(f'Saving logs to {log_file}')

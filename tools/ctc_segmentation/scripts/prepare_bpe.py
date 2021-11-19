@@ -162,7 +162,7 @@ def prepare_text_default(config, text, qn=True, char_list=None):
         if not ground_truth.endswith(config.space):
             ground_truth += config.space
         # Start new utterance remember index
-        utt_begin_indices.append(len(ground_truth)-1)
+        utt_begin_indices.append(len(ground_truth) - 1)
         # Add chars of utterance
         for char in utt:
             # if char.isspace() and config.replace_spaces_with_blanks:
@@ -198,7 +198,7 @@ def prepare_text_default(config, text, qn=True, char_list=None):
                     span = span.replace(config.space, blank)
                     char_index = config.char_list.index(span)
                     ground_truth_mat[i, s] = char_index
-                    ground_truth_mat[i, s+1] = config.char_list.index(config.space)
+                    ground_truth_mat[i, s + 1] = config.char_list.index(config.space)
                 else:
                     char_index = config.char_list.index(span)
                     ground_truth_mat[i, s] = char_index
@@ -215,7 +215,9 @@ def prepare_text_default(config, text, qn=True, char_list=None):
                     char_index = config.char_list.index(config.tokenized_meta_symbol + span)
                     ground_truth_mat[i, s] = char_index
                 elif span.startswith(config.space) and span[1:] in config.char_list:
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
                     char_index = config.char_list.index(span[1:])
                     ground_truth_mat[i, s] = char_index
             elif qn and span in config.char_list:
@@ -254,6 +256,7 @@ def get_config_match_cs():
     # config.tokenized_meta_symbol = "##"
     return config
 
+
 def get_config_qn():
     asr_model = nemo_asr.models.EncDecCTCModel.from_pretrained("QuartzNet15x5Base-En")
     vocabulary = list(asr_model.cfg.decoder.vocabulary) + ["ε"]
@@ -262,6 +265,7 @@ def get_config_qn():
     config.blank = len(vocabulary) - 1
     config.space = " "
     return config
+
 
 if __name__ == "__main__":
     """
@@ -283,7 +287,6 @@ if __name__ == "__main__":
     config = get_config_qn()
     ground_truth_mat, utt_begin_indices = prepare_text_default(config, text)
     _print(ground_truth_mat, config.char_list)
-
 
     """
     text = ["a carrier", "upon market"]

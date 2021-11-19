@@ -15,6 +15,7 @@
 import re
 import string
 import sys
+
 from tqdm import tqdm
 
 try:

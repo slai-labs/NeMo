@@ -15,21 +15,22 @@
 import argparse
 import os
 import re
+import string
 from pathlib import Path
-from typing import List
-from joblib import Parallel, delayed
 from shutil import copyfile
-from tqdm import tqdm
-from pydub.utils import mediainfo
+from typing import List
 
 import regex
 import scipy.io.wavfile as wav
+from joblib import Parallel, delayed
 from normalization_helpers import LATIN_TO_RU, RU_ABBREVIATIONS
-from nemo.collections.asr.models import ASRModel
 from num2words import num2words
-from nemo.utils import model_utils
-# from nemo.collections.asr.parts.preprocessing.segment import AudioSegment
 from pydub import AudioSegment
+from pydub.utils import mediainfo
+from tqdm import tqdm
+
+from nemo.collections.asr.models import ASRModel
+from nemo.utils import model_utils
 
 try:
     from nemo_text_processing.text_normalization.normalize import Normalizer
@@ -58,7 +59,6 @@ parser.add_argument(
 parser.add_argument(
     '--model', type=str, default='QuartzNet15x5Base-En', help='Pre-trained model name or path to model checkpoint'
 )
-parser.add_argument('--min_length', type=int, default=1, help='Min number of words of the text segment for alignment.')
 parser.add_argument(
     '--max_length', type=int, default=40, help='Max number of words of the text segment for alignment.'
 )
@@ -75,6 +75,7 @@ parser.add_argument(
     action='store_true',
     help='Set to True to use NeMo Normalization tool to convert numbers from written to spoken format.',
 )
+
 
 def convert_audio(in_file: str, wav_file: str = None, sample_rate: int = 16000) -> str:
     """
@@ -108,16 +109,19 @@ def process_audio(in_file: str, wav_file: str = None, cut_prefix: int = 0, sampl
         cut_prefix: number of seconds to cut from the beginning of the audio file
         sample_rate: target sampling rate
     """
-    meta = mediainfo(in_file)
-    if meta["channels"] != "1" or meta["sample_rate"] != str(sample_rate) or meta["format_name"] != "wav":
-        wav_audio = convert_audio(str(in_file), wav_file, sample_rate)
-    else:
-        copyfile(in_file, wav_file)
+    try:
+        meta = mediainfo(in_file)
+        if meta["channels"] != "1" or meta["sample_rate"] != str(sample_rate) or meta["format_name"] != "wav":
+            wav_audio = convert_audio(str(in_file), wav_file, sample_rate)
+        else:
+            copyfile(in_file, wav_file)
 
-    if cut_prefix > 0:
-        # cut a few seconds of audio from the beginning
-        audio = AudioSegment.from_file(in_file, offset=cut_prefix)
-        wav.write(wav_audio, data=audio._samples, rate=sample_rate)
+        if cut_prefix > 0:
+            # cut a few seconds of audio from the beginning
+            audio = AudioSegment.from_file(in_file, offset=cut_prefix)
+            wav.write(wav_audio, data=audio._samples, rate=sample_rate)
+    except Exception as e:
+        print(f'{in_file} skipped - {e}')
 
 
 def split_text(
@@ -127,7 +131,6 @@ def split_text(
     language='eng',
     remove_brackets=True,
     do_lower_case=True,
-    min_length=0,
     max_length=100,
     additional_split_symbols=None,
     use_nemo_normalization=False,
@@ -217,13 +220,10 @@ def split_text(
             return sentences
 
         split_on_symbols = split_on_symbols.split('|')
+
         def _split(sentences, delimiter):
             result = []
             for sent in sentences:
-                # if ":" in delimiter and "Nar" in sent:
-                #     print(sent)
-                #     import pdb; pdb.set_trace()
-                #     print()
                 split_sent = sent.split(delimiter)
                 # keep the delimiter
                 split_sent = [(s + delimiter).strip() for s in split_sent[:-1]] + [split_sent[-1]]
@@ -233,8 +233,9 @@ def split_text(
                     # that result in a single word split. It's usually not recommended to do that for other delimiters.
                     comb = []
                     for s in split_sent:
+                        MIN_LEN = 2
                         # if the previous sentence is too short, combine it with the current sentence
-                        if len(comb) > 0 and (len(comb[-1].split()) == 1 or len(s.split()) == 1):
+                        if len(comb) > 0 and (len(comb[-1].split()) <= MIN_LEN or len(s.split()) <= MIN_LEN):
                             comb[-1] = comb[-1] + " " + s
                         else:
                             comb.append(s)
@@ -255,51 +256,32 @@ def split_text(
 
     sentences = additional_split(sentences, additional_split_symbols)
 
-    if language == 'en':
-        vocabulary_symbols = "A, E, I, O, U, B, C, D, F, G, H, J, K, L, M, N, P, Q, R, S, T, V, X, Z, W, Y"
-        vocabulary_symbols += vocabulary_symbols.lower()
-        vocabulary_symbols = list(vocabulary_symbols)
-    else:
-        vocabulary_symbols = []
-        for x in vocabulary:
-            if x != '<unk>':
-                vocabulary_symbols.extend([x for x in x.replace("##", "").replace("▁", "")])
-        vocabulary_symbols = list(set(vocabulary_symbols))
+    vocabulary_symbols = []
+    for x in vocabulary:
+        if x != '<unk>':
+            vocabulary_symbols.extend([x for x in x.replace("##", "").replace("▁", "")])
+    vocabulary_symbols = list(set(vocabulary_symbols))
 
     # check to make sure there will be no utterances for segmentation with only OOV symbols
     vocab_no_space_with_digits = set(vocabulary_symbols + [i for i in range(10)])
     if " " in vocab_no_space_with_digits:
         vocab_no_space_with_digits.remove(' ')
-    sentences = [s for s in sentences if len(vocab_no_space_with_digits.intersection(set(s))) > 0]
+    sentences = [
+        s.strip() for s in sentences if len(vocab_no_space_with_digits.intersection(set(s))) > 0 and s.strip()
+    ]
 
-    # if min_length > 0:
-    #     sentences_comb = []
-    #     sentences_comb.append(sentences[0])
-    #     # combines short sentence
-    #     for sent in sentences:
-    #         # if "&gt" in sent:
-    #         #     print(sent)
-    #         #     import pdb; pdb.set_trace()
-    #         if (sent.strip()[-1] not in [";", ":"] and sentences_comb[-1] not in [";", ":"]) and (len(sentences_comb[-1].split()) < min_length or len(sent.split()) < min_length):
-    #             sentences_comb[-1] += ' ' + sent.strip()
-    #         else:
-    #             sentences_comb.append(sent.strip())
-    #     sentences = sentences_comb
-
-    sentences = [s.strip() for s in sentences if s.strip()]
-
-    # check for cases where no punctuation marks present in the input text or when punctuation is mininal
-    # this could result in very long sentences. Split based on max_length
+    # check for cases where no punctuation marks present in the input text or when punctuation is minimal
+    # (this could result in very long sentences). Split based on max_length
     all_sentences = []
     for sent in sentences:
         sent = sent.split()
         # allow a few extra words to avoid too short sentences
-        if len(sent) < max_length * 5:
+        if len(sent) < max_length:
             all_sentences.append(" ".join(sent))
         else:
             for i in range(0, len(sent), max_length):
-                all_sentences.append(" ".join(sent[i: i+max_length]))
-    sentences = all_sentences
+                all_sentences.append(" ".join(sent[i : i + max_length]))
+    sentences = [s.strip() for s in all_sentences if s.strip()]
     del all_sentences
 
     # save split text with original punctuation and case
@@ -324,6 +306,8 @@ def split_text(
         sentences_norm = normalizer.normalize_list(sentences, verbose=False, punct_post_process=True)
         if len(sentences_norm) != len(sentences):
             raise ValueError(f'Normalization failed, number of sentences does not match.')
+        else:
+            sentences = sentences_norm
 
     sentences = '\n'.join(sentences)
 
@@ -393,13 +377,7 @@ def split_text(
     if do_lower_case:
         sentences = sentences.lower()
 
-    # remove all OOV symbols
-    import string
-
-    # use QN vocabs for available languages
-    symbols_to_remove = string.punctuation.replace(
-        "'", ""
-    )  # ''.join(set(sentences).difference(set(vocabulary + ['\n'])))
+    symbols_to_remove = string.punctuation.replace("'", "")
     sentences = sentences.translate(''.maketrans(symbols_to_remove, len(symbols_to_remove) * ' '))
     # remove extra space
     sentences = re.sub(r' +', ' ', sentences)
@@ -443,7 +421,6 @@ if __name__ == '__main__':
                 out_text_file,
                 vocabulary=vocabulary,
                 language=args.language,
-                min_length=args.min_length,
                 max_length=args.max_length,
                 additional_split_symbols=args.additional_split_symbols,
                 use_nemo_normalization=args.use_nemo_normalization,
@@ -455,11 +432,14 @@ if __name__ == '__main__':
             raise ValueError(f'{args.audio_dir} not found. "--audio_dir" should contain .mp3 or .wav files.')
 
         audio_paths = list(Path(args.audio_dir).glob("*"))
-        assert len(set([os.path.splitext(x.name)[-1] for x in audio_paths]).difference(set([".wav", ".mp3"]))) == 0
 
-        # normalized_lines = Parallel(n_jobs=args.n_jobs)(
-        #     delayed(process_audio)(audio_paths[i], os.path.join(args.output_dir, os.path.splitext(audio_paths[i].name)[0] + ".wav"), args.cut_prefix, args.sample_rate) for i in tqdm(range(len(audio_paths)))
-        # )
-        for i in tqdm(range(len(audio_paths))):
-            process_audio(audio_paths[i], os.path.join(args.output_dir, os.path.splitext(audio_paths[i].name)[0] + ".wav"), args.cut_prefix, args.sample_rate)
+        normalized_lines = Parallel(n_jobs=args.n_jobs)(
+            delayed(process_audio)(
+                audio_paths[i],
+                os.path.join(args.output_dir, os.path.splitext(audio_paths[i].name)[0] + ".wav"),
+                args.cut_prefix,
+                args.sample_rate,
+            )
+            for i in tqdm(range(len(audio_paths)))
+        )
     print('Done.')

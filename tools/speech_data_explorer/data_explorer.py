@@ -91,6 +91,9 @@ def parse_args():
         action='store_true',
         help='estimate frequency bandwidth and signal level of audio recordings',
     )
+    parser.add_argument(
+        '--edge_len', type=int, help='Number of characters to use for CER calculation at the edges', default=5
+    )
     parser.add_argument('--debug', '-d', action='store_true', help='enable debug mode')
     args = parser.parse_args()
     print(args)
@@ -115,7 +118,7 @@ def eval_bandwidth(signal, sr, threshold=-50):
 
 
 # load data from JSON manifest file
-def load_data(data_filename, disable_caching=False, estimate_audio=False, vocab=None):
+def load_data(data_filename, disable_caching=False, estimate_audio=False, vocab=None, edge_len=5):
     if not disable_caching:
         pickle_filename = data_filename.split('.json')[0]
         json_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(data_filename))
@@ -208,6 +211,8 @@ def load_data(data_filename, disable_caching=False, estimate_audio=False, vocab=
                 data[-1]['WER'] = round(word_dist / num_words * 100.0, 2)
                 data[-1]['CER'] = round(char_dist / num_chars * 100.0, 2)
                 data[-1]['WMR'] = round(num_matches / num_words * 100.0, 2)
+                # data[-1]['start_CER'] = round(editdistance.eval(item['text'][:edge_len], item['pred_text'][:edge_len]) / edge_len * 100, 2)
+                # data[-1]['end_CER'] = round(editdistance.eval(item['text'][-edge_len:], item['pred_text'][-edge_len:]) / edge_len * 100, 2)
 
             if estimate_audio:
                 signal, sr = librosa.load(item['audio_filepath'], sr=None)
@@ -301,7 +306,7 @@ def plot_word_accuracy(vocabulary_data):
 args = parse_args()
 print('Loading data...')
 data, wer, cer, wmr, mwa, num_hours, vocabulary, alphabet, metrics_available = load_data(
-    args.manifest, args.disable_caching_metrics, args.estimate_audio_metrics, args.vocab
+    args.manifest, args.disable_caching_metrics, args.estimate_audio_metrics, args.vocab, args.edge_len
 )
 print('Starting server...')
 app = dash.Dash(

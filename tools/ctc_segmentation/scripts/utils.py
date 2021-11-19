@@ -14,27 +14,29 @@
 
 import logging
 import logging.handlers
+import math
 import multiprocessing
 import os
 from pathlib import PosixPath
 from typing import List, Tuple, Union
-import math
 
 import ctc_segmentation as cs
 import numpy as np
+from tqdm import tqdm
+
 from nemo.collections.common.tokenizers.sentencepiece_tokenizer import SentencePieceTokenizer
 
 
 def get_segments(
-        log_probs: np.ndarray,
-        path_wav: Union[PosixPath, str],
-        transcript_file: Union[PosixPath, str],
-        output_file: str,
-        vocabulary: List[str],
-        tokenizer: SentencePieceTokenizer,
-        bpe_model: bool,
-        index_duration: float,
-        window_size: int = 8000,
+    log_probs: np.ndarray,
+    path_wav: Union[PosixPath, str],
+    transcript_file: Union[PosixPath, str],
+    output_file: str,
+    vocabulary: List[str],
+    tokenizer: SentencePieceTokenizer,
+    bpe_model: bool,
+    index_duration: float,
+    window_size: int = 8000,
 ) -> None:
     """
     Segments the audio into segments and saves segments timings to a file
@@ -51,57 +53,58 @@ def get_segments(
         window_size: the length of each utterance (in terms of frames of the CTC outputs) fits into that window.
         index_duration: corresponding time duration of one CTC output index (in seconds)
     """
-    with open(transcript_file, "r") as f:
-        text = f.readlines()
-        text = [t.strip() for t in text if t.strip()]
-
-    # add corresponding original text without pre-processing
-    transcript_file_no_preprocessing = transcript_file.replace('.txt', '_with_punct.txt')
-    if not os.path.exists(transcript_file_no_preprocessing):
-        raise ValueError(f'{transcript_file_no_preprocessing} not found.')
-
-    with open(transcript_file_no_preprocessing, "r") as f:
-        text_no_preprocessing = f.readlines()
-        text_no_preprocessing = [t.strip() for t in text_no_preprocessing if t.strip()]
-
-    # add corresponding normalized original text
-    transcript_file_normalized = transcript_file.replace('.txt', '_with_punct_normalized.txt')
-    if not os.path.exists(transcript_file_normalized):
-        raise ValueError(f'{transcript_file_normalized} not found.')
-
-    with open(transcript_file_normalized, "r") as f:
-        text_normalized = f.readlines()
-        text_normalized = [t.strip() for t in text_normalized if t.strip()]
-
-    if len(text_no_preprocessing) != len(text):
-        raise ValueError(f'{transcript_file} and {transcript_file_no_preprocessing} do not match')
-
-    if len(text_normalized) != len(text):
-        raise ValueError(f'{transcript_file} and {transcript_file_normalized} do not match')
-
-    config = cs.CtcSegmentationParameters()
-    config.char_list = vocabulary
-    config.min_window_size = window_size
-    config.index_duration = index_duration
-    config.blank = len(vocabulary) - 1
-
-    if bpe_model:
-        ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
-    else:
-        config.space = " "
-        ground_truth_mat, utt_begin_indices = _prepare_text_default(config, text)
-        _print(ground_truth_mat, config.char_list)
-
-    logging.debug(f"Syncing {transcript_file}")
-    logging.debug(
-        f"Audio length {os.path.basename(path_wav)}: {log_probs.shape[0]}. "
-        f"Text length {os.path.basename(transcript_file)}: {len(ground_truth_mat)}"
-    )
-
     try:
+        with open(transcript_file, "r") as f:
+            text = f.readlines()
+            text = [t.strip() for t in text if t.strip()]
+
+        # add corresponding original text without pre-processing
+        transcript_file_no_preprocessing = transcript_file.replace('.txt', '_with_punct.txt')
+        if not os.path.exists(transcript_file_no_preprocessing):
+            raise ValueError(f'{transcript_file_no_preprocessing} not found.')
+
+        with open(transcript_file_no_preprocessing, "r") as f:
+            text_no_preprocessing = f.readlines()
+            text_no_preprocessing = [t.strip() for t in text_no_preprocessing if t.strip()]
+
+        # add corresponding normalized original text
+        transcript_file_normalized = transcript_file.replace('.txt', '_with_punct_normalized.txt')
+        if not os.path.exists(transcript_file_normalized):
+            raise ValueError(f'{transcript_file_normalized} not found.')
+
+        with open(transcript_file_normalized, "r") as f:
+            text_normalized = f.readlines()
+            text_normalized = [t.strip() for t in text_normalized if t.strip()]
+
+        if len(text_no_preprocessing) != len(text):
+            raise ValueError(f'{transcript_file} and {transcript_file_no_preprocessing} do not match')
+
+        if len(text_normalized) != len(text):
+            raise ValueError(f'{transcript_file} and {transcript_file_normalized} do not match')
+
+        config = cs.CtcSegmentationParameters()
+        config.char_list = vocabulary
+        config.min_window_size = window_size
+        config.index_duration = index_duration
+        config.blank = len(vocabulary) - 1
+
+        if bpe_model:
+            ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
+        else:
+            config.space = " "
+            ground_truth_mat, utt_begin_indices = _prepare_text_default(config, text)
+            _print(ground_truth_mat, config.char_list)
+
+        logging.debug(f"Syncing {transcript_file}")
+        logging.debug(
+            f"Audio length {os.path.basename(path_wav)}: {log_probs.shape[0]}. "
+            f"Text length {os.path.basename(transcript_file)}: {len(ground_truth_mat)}"
+        )
+
         timings, char_probs, char_list = cs.ctc_segmentation(config, log_probs, ground_truth_mat)
         _print(ground_truth_mat, vocabulary)
         segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
+        # segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
 
         """
         # WIP to split long audio segments after initial segmentation
@@ -138,8 +141,8 @@ def get_segments(
 
         write_output(output_file, path_wav, segments, text, text_no_preprocessing, text_normalized)
         for i, (word, segment) in enumerate(zip(text, segments)):
-            if i < 10:
-                print(f"{segment[0]:.2f} {segment[1]:.2f} {segment[2]:3.4f} {word}")
+            if i < 5:
+                logging.debug(f"{segment[0]:.2f} {segment[1]:.2f} {segment[2]:3.4f} {word}")
 
     except Exception as e:
         logging.info(e)
@@ -154,7 +157,7 @@ def _prepare_text_default(config, text):
         if not ground_truth.endswith(config.space):
             ground_truth += config.space
         # Start new utterance remember index
-        utt_begin_indices.append(len(ground_truth)-1)
+        utt_begin_indices.append(len(ground_truth) - 1)
         # Add chars of utterance
         for char in utt:
             if char in config.char_list and char not in config.excluded_characters:
@@ -202,7 +205,9 @@ def _prepare_tokenized_text_for_bpe_model(text: List[str], tokenizer, vocabulary
     ground_truth_mat = np.array(ground_truth_mat, np.int64)
     return ground_truth_mat, utt_begin_indices
 
-def _print(ground_truth_mat, vocabulary):
+
+def _print(ground_truth_mat, vocabulary, limit=20):
+    """Prints transition matrix"""
     chars = []
     for row in ground_truth_mat:
         chars.append([])
@@ -210,7 +215,8 @@ def _print(ground_truth_mat, vocabulary):
             if ch_id != -1:
                 chars[-1].append(vocabulary[int(ch_id)])
 
-    [print(x) for x in chars[:100]]
+    for x in chars[:limit]:
+        logging.debug(x)
 
 
 def _get_blank_spans(char_list, blank='ε'):
@@ -266,7 +272,9 @@ def determine_utterance_segments(config, utt_begin_indices, char_probs, timings,
     """
     segments = []
     min_prob = np.float64(-10000000000.0)
-    for i in range(len(text)):
+    for i in tqdm(range(len(text))):
+        # if "quorum" in text[i]:
+        #     import pdb; pdb.set_trace()
         start = _compute_time(utt_begin_indices[i], "begin", timings)
         end = _compute_time(utt_begin_indices[i + 1], "end", timings)
 
@@ -274,7 +282,7 @@ def determine_utterance_segments(config, utt_begin_indices, char_probs, timings,
         start_t_floor = math.floor(start_t)
 
         # look for the left most blank symbol and split in the middle to fix start utterance segmentation
-        if False and char_list[start_t_floor] == config.char_list[config.blank]:
+        if char_list[start_t_floor] == config.char_list[config.blank]:
             start_blank = None
             j = start_t_floor - 1
             while char_list[j] == config.char_list[config.blank] and j > start_t_floor - 20:
@@ -290,6 +298,7 @@ def determine_utterance_segments(config, utt_begin_indices, char_probs, timings,
             start_t = int(round(start_t))
 
         end_t = int(round(end / config.index_duration_in_seconds))
+        # end_t = math.floor(end / config.index_duration_in_seconds)
 
         # Compute confidence score by using the min mean probability after splitting into segments of L frames
         n = config.score_min_mean_over_L
@@ -300,17 +309,18 @@ def determine_utterance_segments(config, utt_begin_indices, char_probs, timings,
         else:
             min_avg = np.float64(0.0)
             for t in range(start_t, end_t - n):
-                min_avg = min(min_avg, char_probs[t: t + n].mean())
+                min_avg = min(min_avg, char_probs[t : t + n].mean())
         segments.append((start, end, min_avg))
     return segments
 
+
 def write_output(
-        out_path: str,
-        path_wav: str,
-        segments: List[Tuple[float]],
-        text: str,
-        text_no_preprocessing: str,
-        text_normalized: str
+    out_path: str,
+    path_wav: str,
+    segments: List[Tuple[float]],
+    text: str,
+    text_no_preprocessing: str,
+    text_normalized: str,
 ):
     """
     Write the segmentation output to a file
@@ -382,13 +392,25 @@ def worker_configurer(queue, level):
 
 
 def worker_process(
-        queue, configurer, level, log_probs, path_wav, transcript_file, output_file, vocabulary, tokenizer, asr_model,
-        index_duration, window_len
+    queue,
+    configurer,
+    level,
+    log_probs,
+    path_wav,
+    transcript_file,
+    output_file,
+    vocabulary,
+    tokenizer,
+    asr_model,
+    index_duration,
+    window_len,
 ):
     configurer(queue, level)
     name = multiprocessing.current_process().name
     innerlogger = logging.getLogger('worker')
     innerlogger.info(f'{name} is processing {path_wav}, window_len={window_len}')
-    get_segments(log_probs, path_wav, transcript_file, output_file, vocabulary, tokenizer, asr_model, index_duration,
-                 window_len)
-    innerlogger.info(f'{name} completed segmentation of {path_wav}, segments saved to {output_file}')
+    get_segments(
+        log_probs, path_wav, transcript_file, output_file, vocabulary, tokenizer, asr_model, index_duration, window_len
+    )
+    if os.path.exists(output_file):
+        innerlogger.info(f'{name} completed segmentation of {path_wav}, segments saved to {output_file}')

@@ -262,8 +262,8 @@ class TextNormalizationTestDataset:
                 class2correct[classes[ix][class_idx]] += correct
                 if not correct:
                     class_str = classes[ix][class_idx]
-                    span_start = max(class_idx-1, 0)
-                    center = " ".join(sent[span_ends[ix][span_start]:span_ends[ix][class_idx]])
+                    span_start = max(class_idx - 1, 0)
+                    center = " ".join(sent[span_ends[ix][span_start] : span_ends[ix][class_idx]])
                     print(center)
                     error_f.write(f"{class_str}\tInput\tFULL\n")
                     error_f.write(f"{class_str}\tCente\t{center}\n")

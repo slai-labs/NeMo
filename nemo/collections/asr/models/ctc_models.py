@@ -675,8 +675,6 @@ class EncDecCTCModel(ASRModel, ExportableEncDecModel, ASRModuleMixin):
             'batch_size': batch_size,
             'trim_silence': False,
             'shuffle': False,
-            'num_workers': min(batch_size, os.cpu_count() - 1),
-            'pin_memory': True,
         }
 
         temporary_datalayer = self._setup_dataloader_from_config(config=DictConfig(dl_config))
