@@ -128,15 +128,14 @@ if __name__ == '__main__':
         log_probs = None
         try:
             log_probs = asr_model.transcribe(paths2audio_files=[str(path_audio)], batch_size=1, logprobs=True)[0]
+            all_log_probs.append(log_probs)
+            all_segment_file.append(str(segment_file))
+            all_transcript_file.append(str(transcript_file))
+            all_wav_paths.append(path_audio)
         except Exception as e:
             print(e)
             print(f"Skipping {path_audio.name}")
             continue
-
-        all_log_probs.append(log_probs)
-        all_segment_file.append(str(segment_file))
-        all_transcript_file.append(str(transcript_file))
-        all_wav_paths.append(path_audio)
 
     asr_model_type = type(asr_model)
     del asr_model

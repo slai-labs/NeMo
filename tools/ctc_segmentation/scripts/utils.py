@@ -91,9 +91,23 @@ def get_segments(
         if bpe_model:
             ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
         else:
-            config.space = " "
-            ground_truth_mat, utt_begin_indices = _prepare_text_default(config, text)
+            # old package
+            config.blank = config.space
+            config.frame_duration_ms = 20
+            config.blank = vocabulary[-1]
+            config.subsampling_factor = 2
+            ground_truth_mat, utt_begin_indices = cs.prepare_text(config, text)
             _print(ground_truth_mat, config.char_list)
+            for x in ground_truth_mat[:utt_begin_indices[1]+2]:
+                print(x)
+
+
+            # config.space = " "
+            # config.blank = -1 #vocabulary.index(" ") #-1
+            # config.replace_spaces_with_blanks = True
+            # # ground_truth_mat, utt_begin_indices = _prepare_text_default(config, text)
+            # ground_truth_mat, utt_begin_indices = prepare_text_cs_new(config, text)
+            # _print(ground_truth_mat, config.char_list)
 
         logging.debug(f"Syncing {transcript_file}")
         logging.debug(
@@ -103,8 +117,8 @@ def get_segments(
 
         timings, char_probs, char_list = cs.ctc_segmentation(config, log_probs, ground_truth_mat)
         _print(ground_truth_mat, vocabulary)
-        segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
-        # segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
+        # segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
+        segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
 
         """
         # WIP to split long audio segments after initial segmentation
@@ -138,6 +152,7 @@ def get_segments(
         text_normalized[seg_id] = text_seg
         text_no_preprocessing[seg_id] = text_seg
         """
+        import pdb; pdb.set_trace()
 
         write_output(output_file, path_wav, segments, text, text_no_preprocessing, text_normalized)
         for i, (word, segment) in enumerate(zip(text, segments)):
@@ -148,6 +163,57 @@ def get_segments(
         logging.info(e)
         logging.info(f"segmentation of {transcript_file} failed")
 
+def prepare_text_cs_new(config, text, char_list=None):
+    """Prepare the given text for CTC segmentation.
+
+    Creates a matrix of character symbols to represent the given text,
+    then creates list of char indices depending on the models char list.
+
+    :param config: an instance of CtcSegmentationParameters
+    :param text: iterable of utterance transcriptions
+    :param char_list: a set or list that includes all characters/symbols,
+                        characters not included in this list are ignored
+    :return: label matrix, character index matrix
+    """
+    # temporary compatibility fix for previous espnet versions
+    if type(config.blank) == str:
+        config.blank = -1
+    if char_list is not None:
+        config.char_list = char_list
+    blank = config.char_list[config.blank]
+    ground_truth = config.start_of_ground_truth
+    utt_begin_indices = []
+    for utt in text:
+        # One space in-between
+        if not ground_truth.endswith(config.space):
+            ground_truth += config.space
+        # Start new utterance remember index
+        utt_begin_indices.append(len(ground_truth) - 1)
+        # Add chars of utterance
+        for char in utt:
+            if char.isspace() and config.replace_spaces_with_blanks:
+                if not ground_truth.endswith(config.space):
+                    ground_truth += config.space
+            elif char in config.char_list and char not in config.excluded_characters:
+                ground_truth += char
+    # Add space to the end
+    if not ground_truth.endswith(config.space):
+        ground_truth += config.space
+    logging.debug(f"ground_truth: {ground_truth}")
+    utt_begin_indices.append(len(ground_truth) - 1)
+    # Create matrix: time frame x number of letters the character symbol spans
+    max_char_len = max([len(c) for c in config.char_list])
+    ground_truth_mat = np.ones([len(ground_truth), max_char_len], np.int64) * -1
+    for i in range(len(ground_truth)):
+        for s in range(max_char_len):
+            if i - s < 0:
+                continue
+            span = ground_truth[i - s : i + 1]
+            span = span.replace(config.space, blank)
+            if span in config.char_list:
+                char_index = config.char_list.index(span)
+                ground_truth_mat[i, s] = char_index
+    return ground_truth_mat, utt_begin_indices
 
 def _prepare_text_default(config, text):
     ground_truth = config.start_of_ground_truth

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # default values for optional arguments
-MIN_SCORE=-10
+MIN_SCORE=-100
 CUT_PREFIX=0
 SCRIPTS_DIR="scripts"
 OFFSET=0
@@ -28,8 +28,8 @@ OUTPUT_DIR="output_segmentation"
 # Benchmarking
 FOLDER="subset" #"del"
 DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
-MODEL_NAME_OR_PATH="QuartzNet15x5Base-En"  #"stt_en_citrinet_512_gamma_0_25" #"stt_en_conformer_ctc_small" #
-OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${MODEL_NAME_OR_PATH}${FOLDER}_fix"
+MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_citrinet_512_gamma_0_25" #"stt_en_conformer_ctc_small" #
+OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${MODEL_NAME_OR_PATH}${FOLDER}_nofix2_old_process_sample"
 
 rm -rf ${OUTPUT_DIR}
 
@@ -82,17 +82,17 @@ NEMO_NORMALIZATION=""
       NEMO_NORMALIZATION="--use_nemo_normalization "
     fi
 
-# STEP #1
-# Prepare text and audio data for segmentation
-python $SCRIPTS_DIR/prepare_data.py \
---in_text=$DATA_DIR/text \
---audio_dir=$DATA_DIR/audio \
---output_dir=$OUTPUT_DIR/processed/ \
---language=$LANGUAGE \
---cut_prefix=$CUT_PREFIX \
---model=$MODEL_NAME_OR_PATH \
---max_length=$MAX_SEGMENT_LEN \
---additional_split_symbols=$ADDITIONAL_SPLIT_SYMBOLS $NEMO_NORMALIZATION || exit
+## STEP #1
+## Prepare text and audio data for segmentation
+#python $SCRIPTS_DIR/prepare_data.py \
+#--in_text=$DATA_DIR/text \
+#--audio_dir=$DATA_DIR/audio \
+#--output_dir=$OUTPUT_DIR/processed/ \
+#--language=$LANGUAGE \
+#--cut_prefix=$CUT_PREFIX \
+#--model=$MODEL_NAME_OR_PATH \
+#--max_length=$MAX_SEGMENT_LEN \
+#--additional_split_symbols=$ADDITIONAL_SPLIT_SYMBOLS $NEMO_NORMALIZATION || exit
 
 # STEP #2
 # Run CTC-segmentation
@@ -103,13 +103,16 @@ for WINDOW in 8000 #12000
 do
   python $SCRIPTS_DIR/run_ctc_segmentation.py \
   --output_dir=$OUTPUT_DIR \
-  --data=$OUTPUT_DIR/processed/ \
+  --data=/home/ebakhturina/data/segmentation/benchmark/DEL/sample_processed/ \
   --model=$MODEL_NAME_OR_PATH  \
-  --window_len $WINDOW || exit
+  --window_len $WINDOW \
+  --no_parallel \
+  --debug || exit
 done
 
 # STEP #3 (Optional)
 # Verify aligned segments only if multiple WINDOWs used in the Step #2)
+echo "VERIFYING SEGMENTS"
 python $SCRIPTS_DIR/verify_segments.py \
 --base_dir=$OUTPUT_DIR  || exit
 
@@ -118,6 +121,7 @@ python $SCRIPTS_DIR/verify_segments.py \
 # (use --alignment=$OUTPUT_DIR/segments if only 1 WINDOW size was used in the Step #2)
 # Manifests and corresponding clips folders will be created "high scored clips", segments that have alignment
 # confidence score above the MIN_SCORE value
+echo "CUTTING AUDIO"
 python $SCRIPTS_DIR/cut_audio.py \
 --output_dir=$OUTPUT_DIR \
 --alignment=$OUTPUT_DIR/verified_segments \
