@@ -99,7 +99,7 @@ NEMO_NORMALIZATION=""
 # one might want to perform alignment with various window sizes
 # note if the alignment with the initial window size isn't found, the window size will be double to re-attempt
 # alignment
-for WINDOW in 8000 #12000
+for WINDOW in 16000 #12000
 do
   python $SCRIPTS_DIR/run_ctc_segmentation.py \
   --output_dir=$OUTPUT_DIR \

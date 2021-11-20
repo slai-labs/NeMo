@@ -23,7 +23,7 @@ from typing import List, Tuple, Union
 import ctc_segmentation as cs
 import numpy as np
 from tqdm import tqdm
-
+from csnewn import cython_fill_table_new
 from nemo.collections.common.tokenizers.sentencepiece_tokenizer import SentencePieceTokenizer
 
 
@@ -92,15 +92,16 @@ def get_segments(
         if bpe_model:
             ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
         else:
-            # old package
+            # new package
             config.space = " "
             config.replace_spaces_with_blanks = True
-            # config.blank = config.space
+            config.blank_transition_cost_zero = False
             # config.frame_duration_ms = 20
-            # config.blank = vocabulary[-1]
-            # config.subsampling_factor = 2
             config.blank = vocabulary.index(config.space)
-            config.index_duration = index_duration * 2
+            # config.subsampling_factor = 2
+            # config.blank = vocabulary.index(config.space)
+            config.index_duration = 0.040 #index_duration * 2
+            factor=2
             ground_truth_mat, utt_begin_indices = cs.prepare_text(config, text)
             _print(ground_truth_mat, config.char_list)
             for x in ground_truth_mat[:utt_begin_indices[1]+2]:
@@ -120,7 +121,7 @@ def get_segments(
             f"Text length {os.path.basename(transcript_file)}: {len(ground_truth_mat)}"
         )
 
-        timings, char_probs, char_list = cs.ctc_segmentation(config, log_probs, ground_truth_mat)
+        timings, char_probs, char_list = ctc_segmentation(config, log_probs, ground_truth_mat)
         _print(ground_truth_mat, vocabulary)
         # segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
         segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
@@ -157,16 +158,129 @@ def get_segments(
         text_normalized[seg_id] = text_seg
         text_no_preprocessing[seg_id] = text_seg
         """
-        import pdb; pdb.set_trace()
+
 
         write_output(output_file, path_wav, segments, text, text_no_preprocessing, text_normalized)
         for i, (word, segment) in enumerate(zip(text, segments)):
             if i < 5:
                 logging.debug(f"{segment[0]:.2f} {segment[1]:.2f} {segment[2]:3.4f} {word}")
 
+        import pdb;
+        pdb.set_trace()
+        print()
+
     except Exception as e:
         logging.info(e)
         logging.info(f"segmentation of {transcript_file} failed")
+
+def ctc_segmentation(config, lpz, ground_truth):
+    """Extract character-level utterance alignments.
+
+    :param config: an instance of CtcSegmentationParameters
+    :param lpz: probabilities obtained from CTC output
+    :param ground_truth:  ground truth text in the form of a label sequence
+    :return:
+    """
+    blank = config.blank
+    offset = 0
+    audio_duration = lpz.shape[0] * config.index_duration_in_seconds
+    logging.info(
+        f"CTC segmentation of {len(ground_truth)} chars "
+        f"to {audio_duration:.2f}s audio "
+        f"({lpz.shape[0]} indices)."
+    )
+    if len(ground_truth) > lpz.shape[0] and config.skip_prob <= config.max_prob:
+        raise AssertionError("Audio is shorter than text!")
+    window_size = config.min_window_size
+    # Try multiple window lengths if it fails
+    while True:
+        # Create table of alignment probabilities
+        table = np.zeros(
+            [min(window_size, lpz.shape[0]), len(ground_truth)], dtype=np.float32
+        )
+        table.fill(config.max_prob)
+        # Use array to log window offsets per character
+        offsets = np.zeros([len(ground_truth)], dtype=np.int64)
+        # Run actual alignment of utterances
+        t, c = cython_fill_table_new(
+            table,
+            lpz.astype(np.float32),
+            np.array(ground_truth, dtype=np.int64),
+            offsets,
+            config.blank,
+            config.flags,
+        )
+
+        if config.backtrack_from_max_t:
+            t = table.shape[0] - 1
+        logging.debug(
+            f"Max. joint probability to align text to audio: "
+            f"{table[:, c].max()} at time index {t}"
+        )
+        # Backtracking
+        timings = np.zeros([len(ground_truth)])
+        char_probs = np.zeros([lpz.shape[0]])
+        state_list = [""] * lpz.shape[0]
+        try:
+            # Do until start is reached
+            while t != 0 or c != 0:
+                # Calculate the possible transition probs towards the current cell
+                min_s = None
+                min_switch_prob_delta = np.inf
+                max_lpz_prob = config.max_prob
+                for s in range(ground_truth.shape[1]):
+                    if ground_truth[c, s] != -1:
+                        offset = offsets[c] - (offsets[c - 1 - s] if c - s > 0 else 0)
+                        switch_prob = (
+                            lpz[t + offsets[c], ground_truth[c, s]]
+                            if c > 0
+                            else config.max_prob
+                        )
+                        est_switch_prob = table[t, c] - table[t - 1 + offset, c - 1 - s]
+                        if abs(switch_prob - est_switch_prob) < min_switch_prob_delta:
+                            min_switch_prob_delta = abs(switch_prob - est_switch_prob)
+                            min_s = s
+                        max_lpz_prob = max(max_lpz_prob, switch_prob)
+                stay_prob = (
+                    max(lpz[t + offsets[c], blank], max_lpz_prob)
+                    if t > 0
+                    else config.max_prob
+                )
+                est_stay_prob = table[t, c] - table[t - 1, c]
+                # Check which transition has been taken
+                if abs(stay_prob - est_stay_prob) > min_switch_prob_delta:
+                    # Apply reverse switch transition
+                    if c > 0:
+                        # Log timing and character - frame alignment
+                        for s in range(0, min_s + 1):
+                            timings[c - s] = (
+                                offsets[c] + t
+                            ) * config.index_duration_in_seconds
+                        char_probs[offsets[c] + t] = max_lpz_prob
+                        char_index = ground_truth[c, min_s]
+                        state_list[offsets[c] + t] = config.char_list[char_index]
+                    c -= 1 + min_s
+                    t -= 1 - offset
+                else:
+                    # Apply reverse stay transition
+                    char_probs[offsets[c] + t] = stay_prob
+                    state_list[offsets[c] + t] = config.self_transition
+                    t -= 1
+        except IndexError:
+            logging.warning(
+                "IndexError: Backtracking was not successful, "
+                "the window size might be too small."
+            )
+            window_size *= 2
+            if window_size < config.max_window_size:
+                logging.warning("Increasing the window size to: " + str(window_size))
+                continue
+            else:
+                logging.error("Maximum window size reached.")
+                logging.error("Check data and character list!")
+                raise
+        break
+    return timings, char_probs, state_list
 
 def prepare_text_cs_new(config, text, char_list=None):
     """Prepare the given text for CTC segmentation.
