@@ -87,21 +87,19 @@ def get_segments(
         config.char_list = vocabulary
         config.min_window_size = window_size
         config.index_duration = index_duration
-        config.blank = len(vocabulary) - 1
 
         if bpe_model:
             ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
         else:
             # new package
+            config = cs.CtcSegmentationParameters()
+            excluded_characters_old = ".,-?!:»«;'›‹()"
+            config.excluded_characters = excluded_characters_old
+            config.char_list = vocabulary
+            config.min_window_size = window_size
             config.space = " "
-            config.replace_spaces_with_blanks = True
-            config.blank_transition_cost_zero = False
-            # config.frame_duration_ms = 20
             config.blank = vocabulary.index(config.space)
-            # config.subsampling_factor = 2
-            # config.blank = vocabulary.index(config.space)
-            config.index_duration = 0.040 #index_duration * 2
-            factor=2
+            config.index_duration = 0.04
             ground_truth_mat, utt_begin_indices = cs.prepare_text(config, text)
             _print(ground_truth_mat, config.char_list)
             for x in ground_truth_mat[:utt_begin_indices[1]+2]:
