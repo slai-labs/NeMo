@@ -83,6 +83,7 @@ def get_segments(
             raise ValueError(f'{transcript_file} and {transcript_file_normalized} do not match')
 
         config = cs.CtcSegmentationParameters()
+        config.excluded_characters = ".,-?!:»«;'›‹()"
         config.char_list = vocabulary
         config.min_window_size = window_size
         config.index_duration = index_duration
@@ -92,10 +93,14 @@ def get_segments(
             ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
         else:
             # old package
-            config.blank = config.space
-            config.frame_duration_ms = 20
-            config.blank = vocabulary[-1]
-            config.subsampling_factor = 2
+            config.space = " "
+            config.replace_spaces_with_blanks = True
+            # config.blank = config.space
+            # config.frame_duration_ms = 20
+            # config.blank = vocabulary[-1]
+            # config.subsampling_factor = 2
+            config.blank = vocabulary.index(config.space)
+            config.index_duration = index_duration * 2
             ground_truth_mat, utt_begin_indices = cs.prepare_text(config, text)
             _print(ground_truth_mat, config.char_list)
             for x in ground_truth_mat[:utt_begin_indices[1]+2]:
