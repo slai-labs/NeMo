@@ -102,20 +102,19 @@ def get_segments(
             config_new.excluded_characters = excluded_characters_old
             config_new.char_list = vocabulary
             config_new.min_window_size = window_size
-            config_new.blank = 0
-            config_new.index_duration = index_duration * 2
-            config_new.backtrack_from_max_t = False
+            config_new.blank = 1
+            config_new.index_duration = 0.04 #index_duration * 2
 
             # config_new.frame_duration_ms = frame_duration_ms
             # config_new.subsampling_factor = 2
             # config_new.index_duration = 0.04
             # config = config_new
-            ground_truth_mat, utt_begin_indices = cs.prepare_text(config_new, text)
+            ground_truth_mat, utt_begin_indices = prepare_textNEW(config_new, text)
             # ground_truth_mat[1] = 1
-            _print(ground_truth_mat, config.char_list)
+            _print(ground_truth_mat, config_new.char_list)
             for x in ground_truth_mat[:utt_begin_indices[1]+2]:
                 print(x)
-            # import pdb; pdb.set_trace()
+            import pdb; pdb.set_trace()
 
             # config.space = " "
             # config.blank = -1 #vocabulary.index(" ") #-1
@@ -130,10 +129,11 @@ def get_segments(
             f"Text length {os.path.basename(transcript_file)}: {len(ground_truth_mat)}"
         )
 
-        timings, char_probs, char_list = ctc_segmentation_NEW_TRUE(config, log_probs, ground_truth_mat)
+        timings, char_probs, char_list = ctc_segmentation_new(config_new, log_probs, ground_truth_mat)
         _print(ground_truth_mat, vocabulary)
         # segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
-        segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
+        config_new.blank = 0
+        segments = cs.determine_utterance_segments(config_new, utt_begin_indices, char_probs, timings, text)
 
         """
         # WIP to split long audio segments after initial segmentation
