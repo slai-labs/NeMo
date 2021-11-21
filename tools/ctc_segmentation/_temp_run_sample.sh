@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # default values for optional arguments
-MIN_SCORE=-100
+MIN_SCORE=-5
 CUT_PREFIX=0
 SCRIPTS_DIR="scripts"
 OFFSET=0
@@ -29,7 +29,7 @@ OUTPUT_DIR="output_segmentation"
 FOLDER="subset" #"del"
 DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
 MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_citrinet_512_gamma_0_25" #"stt_en_conformer_ctc_small" #
-OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${MODEL_NAME_OR_PATH}${FOLDER}_nofix2_old_process_sample"
+OUTPUT_DIR="new_package"
 
 rm -rf ${OUTPUT_DIR}
 
@@ -144,24 +144,24 @@ output_filename=${OUTPUT_DIR}/manifests/all_transcribed.json || exit
 #python /home/ebakhturina/NeMo/tools/speech_data_explorer/data_explorer.py --port 8055 \
 #${OUTPUT_DIR}/manifests/all_transcribed.json
 
-# calculate metrics
-python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/calc_metrics.py \
---input=${OUTPUT_DIR}/manifests/all_transcribed.json \
---output=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
---asr_pred=pred_text
-
-# filter
-python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/agg_metrics.py \
---manifest=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
---audio_dir=/home/ebakhturina/data/segmentation/benchmark/DEL/audio/
-
-# clean up
-#rm -rf ${OUTPUT_DIR}/processed
-
-# add filtering based on cer/wer and edge cer
-CER_THRESHOLD=100
-WER_THRESHOLD=100
-CER_START_THRESHOLD=100
-CER_END_THRESHOLD=100
+## calculate metrics
+#python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/calc_metrics.py \
+#--input=${OUTPUT_DIR}/manifests/all_transcribed.json \
+#--output=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
+#--asr_pred=pred_text
+#
+## filter
+#python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/agg_metrics.py \
+#--manifest=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
+#--audio_dir=/home/ebakhturina/data/segmentation/benchmark/DEL/audio/
+#
+## clean up
+##rm -rf ${OUTPUT_DIR}/processed
+#
+## add filtering based on cer/wer and edge cer
+#CER_THRESHOLD=100
+#WER_THRESHOLD=100
+#CER_START_THRESHOLD=100
+#CER_END_THRESHOLD=100
 
 # to do confomrer partition

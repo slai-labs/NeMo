@@ -103,6 +103,9 @@ def get_segments(
             config_new.char_list = vocabulary
             config_new.min_window_size = window_size
             config_new.blank = 0
+            config_new.index_duration = index_duration * 2
+            config_new.backtrack_from_max_t = False
+
             # config_new.frame_duration_ms = frame_duration_ms
             # config_new.subsampling_factor = 2
             # config_new.index_duration = 0.04
