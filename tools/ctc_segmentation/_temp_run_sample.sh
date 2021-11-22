@@ -28,8 +28,8 @@ OUTPUT_DIR="output_segmentation"
 # Benchmarking
 FOLDER="subset" #"del"
 DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
-MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_citrinet_512_gamma_0_25" #"stt_en_conformer_ctc_small" #
-OUTPUT_DIR="new_package"
+MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #"stt_en_conformer_ctc_small" #
+OUTPUT_DIR="new_package_${MODEL_NAME_OR_PATH}"
 
 rm -rf ${OUTPUT_DIR}
 
@@ -144,17 +144,17 @@ output_filename=${OUTPUT_DIR}/manifests/all_transcribed.json || exit
 #python /home/ebakhturina/NeMo/tools/speech_data_explorer/data_explorer.py --port 8055 \
 #${OUTPUT_DIR}/manifests/all_transcribed.json
 
-## calculate metrics
-#python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/calc_metrics.py \
-#--input=${OUTPUT_DIR}/manifests/all_transcribed.json \
-#--output=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
-#--asr_pred=pred_text
-#
-## filter
-#python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/agg_metrics.py \
-#--manifest=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
-#--audio_dir=/home/ebakhturina/data/segmentation/benchmark/DEL/audio/
-#
+# calculate metrics
+python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/calc_metrics.py \
+--input=${OUTPUT_DIR}/manifests/all_transcribed.json \
+--output=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
+--asr_pred=pred_text
+
+# filter
+python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/agg_metrics.py \
+--manifest=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
+--audio_dir=/home/ebakhturina/data/segmentation/benchmark/DEL/audio/
+
 ## clean up
 ##rm -rf ${OUTPUT_DIR}/processed
 #

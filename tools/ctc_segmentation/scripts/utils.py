@@ -82,20 +82,37 @@ def get_segments(
         if len(text_normalized) != len(text):
             raise ValueError(f'{transcript_file} and {transcript_file_normalized} do not match')
 
-        # config = cs.CtcSegmentationParameters()
+        # config_latest = cs.CtcSegmentationParameters()
         # config.excluded_characters = ".,-?!:»«;'›‹()"
         # config.char_list = vocabulary
         # config.min_window_size = window_size
         # config.index_duration = index_duration
 
         if bpe_model:
-            ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary)
+            # move blank values to the first column
+            blank_col = log_probs[:, -1].reshape((log_probs.shape[0], 1))
+            log_probs = np.concatenate((blank_col, log_probs[:, :-1]), axis=1)
+            vocabulary = [vocabulary[-1]] + vocabulary[:-1]
+
+            ground_truth_mat, utt_begin_indices = _prepare_tokenized_text_for_bpe_model(text, tokenizer, vocabulary, 0)
+            config_latest = cs.CtcSegmentationParameters()
+            # excluded_characters_new = ".,»«•❍·"
+            # excluded_characters_old = ".,-?!:»«;'›‹()"
+            # config_latest.excluded_characters = excluded_characters_old
+            config_latest.char_list = vocabulary
+            config_latest.min_window_size = window_size
+            # config_latest.blank = vocabulary.index(" ")
+            # config_new.frame_duration_ms = frame_duration_ms
+            # config_new.subsampling_factor = 2
+            config_latest.index_duration = index_duration
+            config_latest.blank = 0
         else:
             # new package
             # move blank values to the first column
             blank_col = log_probs[:, -1].reshape((log_probs.shape[0], 1))
             log_probs = np.concatenate((blank_col, log_probs[:, :-1]), axis=1)
             vocabulary = [vocabulary[-1]] + vocabulary[:-1]
+
             config_latest = cs.CtcSegmentationParameters()
             excluded_characters_new = ".,»«•❍·"
             excluded_characters_old = ".,-?!:»«;'›‹()"
@@ -105,7 +122,7 @@ def get_segments(
             config_latest.blank = vocabulary.index(" ")
             # config_new.frame_duration_ms = frame_duration_ms
             # config_new.subsampling_factor = 2
-            config_latest.index_duration = 0.04
+            config_latest.index_duration = index_duration #0.04
 
             ground_truth_mat, utt_begin_indices = cs.prepare_text(config_latest, text)
             # ground_truth_mat[1] = 1
@@ -114,13 +131,15 @@ def get_segments(
                 print(x)
             import pdb; pdb.set_trace()
 
+            config_latest.blank = 0
+
 
         logging.debug(f"Syncing {transcript_file}")
         logging.debug(
             f"Audio length {os.path.basename(path_wav)}: {log_probs.shape[0]}. "
             f"Text length {os.path.basename(transcript_file)}: {len(ground_truth_mat)}"
         )
-        config_latest.blank = 0
+
         timings, char_probs, char_list = ctc_segmentationTRUENEW(config_latest, log_probs, ground_truth_mat)
         _print(ground_truth_mat, vocabulary)
         # segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
@@ -865,10 +884,9 @@ def _prepare_text_default(config, text):
     return ground_truth_mat, utt_begin_indices
 
 
-def _prepare_tokenized_text_for_bpe_model(text: List[str], tokenizer, vocabulary: List[str]):
+def _prepare_tokenized_text_for_bpe_model(text: List[str], tokenizer, vocabulary: List[str], blank_idx):
     """ Creates a transition matrix for BPE-based models"""
     space_idx = vocabulary.index("▁")
-    blank_idx = len(vocabulary) - 1
 
     ground_truth_mat = [[-1, -1]]
     utt_begin_indices = []
@@ -876,6 +894,7 @@ def _prepare_tokenized_text_for_bpe_model(text: List[str], tokenizer, vocabulary
         ground_truth_mat += [[blank_idx, space_idx]]
         utt_begin_indices.append(len(ground_truth_mat))
         token_ids = tokenizer.text_to_ids(uttr)
+        token_ids = [idx + 1 for idx in token_ids]
         ground_truth_mat += [[t, -1] for t in token_ids]
 
     utt_begin_indices.append(len(ground_truth_mat))
