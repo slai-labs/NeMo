@@ -103,7 +103,7 @@ for WINDOW in 8000 #12000
 do
   python $SCRIPTS_DIR/run_ctc_segmentation.py \
   --output_dir=$OUTPUT_DIR \
-  --data=/home/ebakhturina/data/segmentation/benchmark/subset/processed \
+  --data=/home/ebakhturina/NeMo/tools/ctc_segmentation/main_QN_subset/processed \
   --model=$MODEL_NAME_OR_PATH  \
   --window_len $WINDOW || exit
 done
