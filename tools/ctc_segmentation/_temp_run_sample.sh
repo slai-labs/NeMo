@@ -7,7 +7,7 @@ SCRIPTS_DIR="scripts"
 OFFSET=0
 LANGUAGE='en' # 'en', 'ru', 'other'
 MAX_SEGMENT_LEN=50
-ADDITIONAL_SPLIT_SYMBOLS=":|;|,"
+ADDITIONAL_SPLIT_SYMBOLS=":|;"
 USE_NEMO_NORMALIZATION='True'
 
 FOLDER="de"
@@ -26,10 +26,10 @@ OUTPUT_DIR="output_segmentation"
 #OUTPUT_DIR="/mnt/sdb/DATA/youtube_mayank/YT/out_${MODEL_NAME_OR_PATH}_2"
 
 # Benchmarking
-FOLDER="subset" #"del"
+FOLDER="" #subset" #"del"
 DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
 MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #"stt_en_conformer_ctc_small" #
-OUTPUT_DIR="new_package_${MODEL_NAME_OR_PATH}"
+OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${MODEL_NAME_OR_PATH}_1.7.1"
 
 rm -rf ${OUTPUT_DIR}
 
@@ -99,15 +99,13 @@ NEMO_NORMALIZATION=""
 # one might want to perform alignment with various window sizes
 # note if the alignment with the initial window size isn't found, the window size will be double to re-attempt
 # alignment
-for WINDOW in 16000 #12000
+for WINDOW in 8000 #12000
 do
   python $SCRIPTS_DIR/run_ctc_segmentation.py \
   --output_dir=$OUTPUT_DIR \
-  --data=/home/ebakhturina/data/segmentation/benchmark/DEL/sample_processed/ \
+  --data=/home/ebakhturina/data/segmentation/benchmark/subset/processed \
   --model=$MODEL_NAME_OR_PATH  \
-  --window_len $WINDOW \
-  --no_parallel \
-  --debug || exit
+  --window_len $WINDOW || exit
 done
 
 # STEP #3 (Optional)

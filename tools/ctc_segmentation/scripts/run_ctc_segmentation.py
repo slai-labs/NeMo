@@ -24,6 +24,7 @@ import torch
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from utils import get_segments
+import numpy as np
 
 import nemo.collections.asr as nemo_asr
 
@@ -84,7 +85,7 @@ if __name__ == '__main__':
         tokenizer = None
 
     # extract ASR vocabulary and add blank symbol
-    vocabulary = list(asr_model.cfg.decoder.vocabulary) + ["ε"]
+    vocabulary = ["ε"] + list(asr_model.cfg.decoder.vocabulary)
     logging.debug(f'ASR Model vocabulary: {vocabulary}')
 
     data = Path(args.data)
@@ -128,6 +129,11 @@ if __name__ == '__main__':
         log_probs = None
         try:
             log_probs = asr_model.transcribe(paths2audio_files=[str(path_audio)], batch_size=1, logprobs=True)[0]
+
+            # move blank values to the first column (ctc-package compatibility)
+            blank_col = log_probs[:, -1].reshape((log_probs.shape[0], 1))
+            log_probs = np.concatenate((blank_col, log_probs[:, :-1]), axis=1)
+
             all_log_probs.append(log_probs)
             all_segment_file.append(str(segment_file))
             all_transcript_file.append(str(transcript_file))
