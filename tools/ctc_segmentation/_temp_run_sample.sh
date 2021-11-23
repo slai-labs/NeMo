@@ -6,7 +6,7 @@ CUT_PREFIX=0
 SCRIPTS_DIR="scripts"
 OFFSET=0
 LANGUAGE='en' # 'en', 'ru', 'other'
-MAX_SEGMENT_LEN=50
+MAX_SEGMENT_LEN=30
 ADDITIONAL_SPLIT_SYMBOLS=":|;"
 USE_NEMO_NORMALIZATION='True'
 
@@ -28,8 +28,8 @@ OUTPUT_DIR="output_segmentation"
 # Benchmarking
 FOLDER="" #subset" #"del"
 DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
-MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #"stt_en_conformer_ctc_small" #
-OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${MODEL_NAME_OR_PATH}_1.7.1"
+MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_conformer_ctc_small" #
+OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${MODEL_NAME_OR_PATH}_1.7.1_new_process"
 
 rm -rf ${OUTPUT_DIR}
 
@@ -82,17 +82,17 @@ NEMO_NORMALIZATION=""
       NEMO_NORMALIZATION="--use_nemo_normalization "
     fi
 
-## STEP #1
-## Prepare text and audio data for segmentation
-#python $SCRIPTS_DIR/prepare_data.py \
-#--in_text=$DATA_DIR/text \
-#--audio_dir=$DATA_DIR/audio \
-#--output_dir=$OUTPUT_DIR/processed/ \
-#--language=$LANGUAGE \
-#--cut_prefix=$CUT_PREFIX \
-#--model=$MODEL_NAME_OR_PATH \
-#--max_length=$MAX_SEGMENT_LEN \
-#--additional_split_symbols=$ADDITIONAL_SPLIT_SYMBOLS $NEMO_NORMALIZATION || exit
+# STEP #1
+# Prepare text and audio data for segmentation
+python $SCRIPTS_DIR/prepare_data.py \
+--in_text=$DATA_DIR/text \
+--audio_dir=$DATA_DIR/audio \
+--output_dir=$OUTPUT_DIR/processed/ \
+--language=$LANGUAGE \
+--cut_prefix=$CUT_PREFIX \
+--model=$MODEL_NAME_OR_PATH \
+--max_length=$MAX_SEGMENT_LEN \
+--additional_split_symbols=$ADDITIONAL_SPLIT_SYMBOLS $NEMO_NORMALIZATION || exit
 
 # STEP #2
 # Run CTC-segmentation
@@ -103,7 +103,7 @@ for WINDOW in 8000 #12000
 do
   python $SCRIPTS_DIR/run_ctc_segmentation.py \
   --output_dir=$OUTPUT_DIR \
-  --data=/home/ebakhturina/NeMo/tools/ctc_segmentation/main_QN_subset/processed \
+  --data=$OUTPUT_DIR/processed \
   --model=$MODEL_NAME_OR_PATH  \
   --window_len $WINDOW || exit
 done
