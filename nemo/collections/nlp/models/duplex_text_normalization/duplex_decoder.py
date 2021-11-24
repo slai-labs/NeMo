@@ -165,7 +165,6 @@ class DuplexDecoderModel(NLPModel):
         generated_texts, _, _ = self._generate_predictions(
             input_ids=batch['input_ids'], model_max_len=self.max_sequence_len
         )
-        inputs_str = self._tokenizer.batch_decode(batch['input_ids'], skip_special_tokens=False)
         results = defaultdict(int)
         for idx, class_id in enumerate(batch['semiotic_class_id']):
             direction = constants.TASK_ID_TO_MODE[batch['direction'][idx][0].item()]
@@ -175,12 +174,6 @@ class DuplexDecoderModel(NLPModel):
                 generated_texts[idx], labels_str[idx], constants.DIRECTIONS_TO_MODE[direction]
             )
 
-            if not pred_result:
-                print()
-                print(f'class: {class_name}')
-                print(f'input: {inputs_str[idx]}')
-                print(f'pred : {generated_texts[idx]}')
-                print(f'targ : {labels_str[idx]}\n')
             results[f"correct_{class_name}_{direction}"] += torch.tensor(pred_result, dtype=torch.int).to(self.device)
             results[f"total_{class_name}_{direction}"] += torch.tensor(1).to(self.device)
 
