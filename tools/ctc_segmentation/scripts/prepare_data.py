@@ -109,25 +109,26 @@ def process_audio(in_file: str, wav_file: str = None, cut_prefix: int = 0, sampl
         cut_prefix: number of seconds to cut from the beginning of the audio file
         sample_rate: target sampling rate
     """
-    try:
-        meta = mediainfo(in_file)
-        if meta["channels"] != "1" or meta["sample_rate"] != str(sample_rate) or meta["format_name"] != "wav":
-            wav_audio = convert_audio(str(in_file), wav_file, sample_rate)
-        else:
-            copyfile(in_file, wav_file)
+    if "ARi6xZRfrrI" in in_file.name:
+        try:
+            meta = mediainfo(in_file)
+            if meta["channels"] != "1" or meta["sample_rate"] != str(sample_rate) or meta["format_name"] != "wav":
+                wav_audio = convert_audio(str(in_file), wav_file, sample_rate)
+            else:
+                copyfile(in_file, wav_file)
 
-        if cut_prefix > 0:
-            # cut a few seconds of audio from the beginning
-            audio = AudioSegment.from_file(in_file, offset=cut_prefix)
-            wav.write(wav_audio, data=audio._samples, rate=sample_rate)
-    except Exception as e:
-        print(f'{in_file} skipped - {e}')
+            if cut_prefix > 0:
+                # cut a few seconds of audio from the beginning
+                audio = AudioSegment.from_file(in_file, offset=cut_prefix)
+                wav.write(wav_audio, data=audio._samples, rate=sample_rate)
+        except Exception as e:
+            print(f'{in_file} skipped - {e}')
 
 
 def split_text(
     in_file: str,
     out_file: str,
-    vocabulary: List[str] = None,
+    vocabulary: List[str],
     language='eng',
     remove_brackets=True,
     do_lower_case=True,
@@ -147,8 +148,6 @@ def split_text(
         remove_brackets: Set to True if square [] and curly {} brackets should be removed from text.
             Text in square/curly brackets often contains inaudible fragments like notes or translations
         do_lower_case: flag that determines whether to apply lower case to the in_file text
-        min_length: Min number of words of the text segment for alignment. Short segments will be combined to be
-            at least min_length (not recommended for multi speaker data).
         max_length: Max number of words of the text segment for alignment
         additional_split_symbols: Additional symbols to use for sentence split if eos sentence split resulted in
             segments longer than --max_length
@@ -156,7 +155,6 @@ def split_text(
             format. Normalization using num2words will be applied afterwards to make sure there are no numbers present
             in the text, otherwise they will be replaced with a space and that could deteriorate segmentation results.
     """
-
     print(f'Splitting text in {in_file} into sentences.')
     with open(in_file, "r") as f:
         transcript = f.read()
@@ -259,9 +257,9 @@ def split_text(
     vocabulary_symbols = []
     for x in vocabulary:
         if x != '<unk>':
+            # for BPE models
             vocabulary_symbols.extend([x for x in x.replace("##", "").replace("▁", "")])
     vocabulary_symbols = list(set(vocabulary_symbols))
-
     # check to make sure there will be no utterances for segmentation with only OOV symbols
     vocab_no_space_with_digits = set(vocabulary_symbols + [i for i in range(10)])
     if " " in vocab_no_space_with_digits:
@@ -391,9 +389,8 @@ if __name__ == '__main__':
 
     text_files = []
     if args.in_text:
-        vocabulary = None
         if args.model is None:
-            print(f"No model provided, vocabulary won't be used")
+            raise ValueError(f"ASR model must be provided to extract vocabulary for text processing")
         elif os.path.exists(args.model):
             model_cfg = ASRModel.restore_from(restore_path=args.model, return_config=True)
             classpath = model_cfg.target  # original class path
