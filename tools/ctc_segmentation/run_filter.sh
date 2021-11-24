@@ -1,16 +1,16 @@
 #!/bin/bash
 
+SCRIPTS_DIR="scripts" # /<PATH TO>/NeMo/tools/ctc_segmentation/tools/scripts/ directory
 MODEL_NAME_OR_PATH=""
 INPUT_AUDIO_DIR=""
 MANIFEST=""
 BATCH_SIZE=4
 
 # Thresholds for filtering
-CER_THRESHOLD=100
-WER_THRESHOLD=100
-CER_START_THRESHOLD=100
-CER_END_THRESHOLD=100
-
+CER_THRESHOLD=35
+WER_THRESHOLD=75
+CER_EDGE_THRESHOLD=35
+LEN_DIFF_THRESHOLD=0.3
 
 for ARG in "$@"
 do
@@ -39,28 +39,27 @@ else
 fi
 
 # Add transcripts to the manifest file, ASR model predictions will be stored under "pred_text" field
-python /home/ebakhturina/NeMo/examples/asr/transcribe_speech.py \
+python ${SCRIPTS_DIR}/../../../examples/asr/transcribe_speech.py \
 $ARG_MODEL=$MODEL_NAME_OR_PATH \
 dataset_manifest=$MANIFEST \
 output_filename=${MANIFEST}_transcribed.json || exit
 
-echo "--- Calculation metrics ---"
-python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/calc_metrics.py \
---input=${MANIFEST}_transcribed.json \
---output=${MANIFEST}_transcribed_metrics.json \
---asr_pred=pred_text
-
-rm -rf ${MANIFEST}_transcribed.json
-
-echo "--- Filter out samples based on thresholds ---"
+echo "--- Calculating metrics and filtering out samples based on thresholds ---"
 echo "CER_THRESHOLD = ${CER_THRESHOLD}"
 echo "WER_THRESHOLD = ${WER_THRESHOLD}"
-echo "CER_START_THRESHOLD = ${CER_START_THRESHOLD}"
-echo "CER_END_THRESHOLD = ${CER_END_THRESHOLD}"
+echo "CER_EDGE_THRESHOLD = ${CER_EDGE_THRESHOLD}"
+echo "LEN_DIFF_THRESHOLD = ${LEN_DIFF_THRESHOLD}"
 
-python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/agg_metrics.py \
---manifest=${MANIFEST}_transcribed_metrics.json \
---audio_dir=/home/ebakhturina/data/segmentation/benchmark/DEL/audio/
+python ${SCRIPTS_DIR}/get_metrics_and_filter.py \
+--manifest=${MANIFEST}_transcribed.json \
+--audio_dir=${INPUT_AUDIO_DIR} \
+--max_cer=${CER_THRESHOLD} \
+--max_wer=${WER_THRESHOLD} \
+--max_len_diff=${LEN_DIFF_THRESHOLD} \
+--max_edge_cer=${CER_EDGE_THRESHOLD}
+
+#rm -rf ${MANIFEST}_transcribed.json
+
 
 # clean up
 ##rm -rf ${OUTPUT_DIR}/processed

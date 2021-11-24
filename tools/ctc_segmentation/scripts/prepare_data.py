@@ -109,20 +109,19 @@ def process_audio(in_file: str, wav_file: str = None, cut_prefix: int = 0, sampl
         cut_prefix: number of seconds to cut from the beginning of the audio file
         sample_rate: target sampling rate
     """
-    if "ARi6xZRfrrI" in in_file.name:
-        try:
-            meta = mediainfo(in_file)
-            if meta["channels"] != "1" or meta["sample_rate"] != str(sample_rate) or meta["format_name"] != "wav":
-                wav_audio = convert_audio(str(in_file), wav_file, sample_rate)
-            else:
-                copyfile(in_file, wav_file)
+    try:
+        meta = mediainfo(in_file)
+        if meta["channels"] != "1" or meta["sample_rate"] != str(sample_rate) or meta["format_name"] != "wav":
+            wav_audio = convert_audio(str(in_file), wav_file, sample_rate)
+        else:
+            copyfile(in_file, wav_file)
 
-            if cut_prefix > 0:
-                # cut a few seconds of audio from the beginning
-                audio = AudioSegment.from_file(in_file, offset=cut_prefix)
-                wav.write(wav_audio, data=audio._samples, rate=sample_rate)
-        except Exception as e:
-            print(f'{in_file} skipped - {e}')
+        if cut_prefix > 0:
+            # cut a few seconds of audio from the beginning
+            audio = AudioSegment.from_file(in_file, offset=cut_prefix)
+            wav.write(wav_audio, data=audio._samples, rate=sample_rate)
+    except Exception as e:
+        print(f'{in_file} skipped - {e}')
 
 
 def split_text(
@@ -268,19 +267,13 @@ def split_text(
         s.strip() for s in sentences if len(vocab_no_space_with_digits.intersection(set(s))) > 0 and s.strip()
     ]
 
-    # check for cases where no punctuation marks present in the input text or when punctuation is minimal
-    # (this could result in very long sentences). Split based on max_length
-    all_sentences = []
-    for sent in sentences:
-        sent = sent.split()
-        # allow a few extra words to avoid too short sentences
-        if len(sent) < max_length:
-            all_sentences.append(" ".join(sent))
-        else:
-            for i in range(0, len(sent), max_length):
-                all_sentences.append(" ".join(sent[i : i + max_length]))
-    sentences = [s.strip() for s in all_sentences if s.strip()]
-    del all_sentences
+    # when no punctuation marks present in the input text, split based on max_length
+    if len(sentences) == 1:
+        sent = sentences[0].split()
+        sentences = []
+        for i in range(0, len(sent), max_length):
+            sentences.append(" ".join(sent[i : i + max_length]))
+    sentences = [s.strip() for s in sentences if s.strip()]
 
     # save split text with original punctuation and case
     out_dir, out_file_name = os.path.split(out_file)

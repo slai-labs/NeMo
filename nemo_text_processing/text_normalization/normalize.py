@@ -32,6 +32,7 @@ except (ModuleNotFoundError, ImportError):
 try:
     from nemo.collections.common.tokenizers.moses_tokenizers import MosesProcessor
     from nemo.collections.nlp.data.text_normalization.utils import post_process_punct
+
     NLP_AVAILABLE = True
 except (ModuleNotFoundError, ImportError):
     NLP_AVAILABLE = False

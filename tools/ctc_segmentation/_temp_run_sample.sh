@@ -3,33 +3,16 @@
 # default values for optional arguments
 MIN_SCORE=-5
 CUT_PREFIX=0
-SCRIPTS_DIR="scripts"
+SCRIPTS_DIR="scripts" # /<PATH TO>/NeMo/tools/ctc_segmentation/tools/scripts/ directory
 OFFSET=0
-LANGUAGE='en' # 'en', 'ru', 'other'
+LANGUAGE='en' # 'en', 'es', 'ru', 'other'
 MAX_SEGMENT_LEN=30
-ADDITIONAL_SPLIT_SYMBOLS=":|;"
+ADDITIONAL_SPLIT_SYMBOLS=":|;|,"
 USE_NEMO_NORMALIZATION='True'
 
-FOLDER="de"
-#DATA_DIR="/home/ebakhturina/data/segmentation/${FOLDER}/data"
-DATA_DIR="/home/ebakhturina/data/segmentation/german/librivox_data"
-MODEL_NAME_OR_PATH="/home/ebakhturina/data/segmentation/models/de/best_stt_de_citrinet_1024.nemo"
-OUTPUT_DIR="/home/ebakhturina/data/segmentation/german/output"
-
-DATA_DIR="/home/ebakhturina/data/ctc_segmentation/eng"
-DATA_DIR="/home/ebakhturina/data/segmentation/test/data"
-MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_citrinet_512_gamma_0_25" #stt_en_citrinet_256  # "QuartzNet15x5Base-En" #
-OUTPUT_DIR="output_segmentation"
-
-#DATA_DIR="/mnt/sdb/DATA/youtube_mayank/YT/data"
-#MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #stt_en_citrinet_256 # "QuartzNet15x5Base-En" #
-#OUTPUT_DIR="/mnt/sdb/DATA/youtube_mayank/YT/out_${MODEL_NAME_OR_PATH}_2"
-
 # Benchmarking
-FOLDER="" #subset" #"del"
-DATA_DIR="/home/ebakhturina/data/segmentation/benchmark/${FOLDER}"
-MODEL_NAME_OR_PATH="QuartzNet15x5Base-En" #"stt_en_conformer_ctc_small" #
-OUTPUT_DIR="/home/ebakhturina/data/segmentation/benchmark/${MODEL_NAME_OR_PATH}_1.7.1_new_process"
+DATA_DIR="/home/ebakhturina/data/segmentation/test/data"
+MODEL_NAME_OR_PATH="stt_en_citrinet_512_gamma_0_25" #"QuartzNet15x5Base-En" #
 
 rm -rf ${OUTPUT_DIR}
 
@@ -125,41 +108,3 @@ python $SCRIPTS_DIR/cut_audio.py \
 --alignment=$OUTPUT_DIR/verified_segments \
 --threshold=$MIN_SCORE \
 --offset=$OFFSET || exit
-
-# STEP #6
-# Add transcripts to the manifest file, ASR model predictions will be stored under "pred_text" field
-if [[ ${MODEL_NAME_OR_PATH,,} == *".nemo" ]]; then
-  ARG_MODEL="model_path";
-else
-  ARG_MODEL="pretrained_name";
-fi
-
-python /home/ebakhturina/NeMo/examples/asr/transcribe_speech.py \
-$ARG_MODEL=$MODEL_NAME_OR_PATH \
-dataset_manifest=${OUTPUT_DIR}/manifests/manifest.json \
-output_filename=${OUTPUT_DIR}/manifests/all_transcribed.json || exit
-
-#python /home/ebakhturina/NeMo/tools/speech_data_explorer/data_explorer.py --port 8055 \
-#${OUTPUT_DIR}/manifests/all_transcribed.json
-
-# calculate metrics
-python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/calc_metrics.py \
---input=${OUTPUT_DIR}/manifests/all_transcribed.json \
---output=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
---asr_pred=pred_text
-
-# filter
-python /home/ebakhturina/misc_scripts/ctc_segmentation/benchmark/agg_metrics.py \
---manifest=${OUTPUT_DIR}/manifests/all_transcribed_metrics.json \
---audio_dir=/home/ebakhturina/data/segmentation/benchmark/DEL/audio/
-
-## clean up
-##rm -rf ${OUTPUT_DIR}/processed
-#
-## add filtering based on cer/wer and edge cer
-#CER_THRESHOLD=100
-#WER_THRESHOLD=100
-#CER_START_THRESHOLD=100
-#CER_END_THRESHOLD=100
-
-# to do confomrer partition

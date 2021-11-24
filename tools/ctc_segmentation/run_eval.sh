@@ -1,5 +1,5 @@
 MODEL_NAME_OR_PATH="stt_en_conformer_ctc_large"
-# STEP #6
+
 # Add transcripts to the manifest file, ASR model predictions will be stored under "pred_text" field
 if [[ ${MODEL_NAME_OR_PATH,,} == *".nemo" ]]; then
   ARG_MODEL="model_path";

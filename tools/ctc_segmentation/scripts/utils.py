@@ -23,6 +23,7 @@ from typing import List, Tuple, Union
 import ctc_segmentation as cs
 import numpy as np
 from tqdm import tqdm
+
 from nemo.collections.common.tokenizers.sentencepiece_tokenizer import SentencePieceTokenizer
 
 
@@ -94,9 +95,6 @@ def get_segments(
             ground_truth_mat, utt_begin_indices = cs.prepare_text(config, text)
 
         _print(ground_truth_mat, config.char_list)
-        # for x in ground_truth_mat[:utt_begin_indices[1]+2]:
-        #     print(x)
-        #     import pdb; pdb.set_trace()
 
         # set this after text prepare_text()
         config.blank = 0
@@ -108,24 +106,19 @@ def get_segments(
 
         timings, char_probs, char_list = cs.ctc_segmentation(config, log_probs, ground_truth_mat)
         _print(ground_truth_mat, vocabulary)
-        # segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
-
-        segments = cs.determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text)
+        segments = determine_utterance_segments(config, utt_begin_indices, char_probs, timings, text, char_list)
 
         write_output(output_file, path_wav, segments, text, text_no_preprocessing, text_normalized)
         for i, (word, segment) in enumerate(zip(text, segments)):
             if i < 5:
                 logging.debug(f"{segment[0]:.2f} {segment[1]:.2f} {segment[2]:3.4f} {word}")
 
-        # import pdb;
-        # pdb.set_trace()
-        # print()
-
     except Exception as e:
         logging.info(e)
         logging.info(f"segmentation of {transcript_file} failed")
 
-def _prepare_tokenized_text_for_bpe_model(text: List[str], tokenizer, vocabulary: List[str], blank_idx: int=0):
+
+def _prepare_tokenized_text_for_bpe_model(text: List[str], tokenizer, vocabulary: List[str], blank_idx: int = 0):
     """ Creates a transition matrix for BPE-based models"""
     space_idx = vocabulary.index("▁")
     ground_truth_mat = [[-1, -1]]

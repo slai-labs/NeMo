@@ -19,12 +19,12 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import scipy.io.wavfile as wav
 import torch
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from utils import get_segments
-import numpy as np
 
 import nemo.collections.asr as nemo_asr
 
