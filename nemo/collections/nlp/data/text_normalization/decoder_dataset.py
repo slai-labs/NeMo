@@ -112,11 +112,11 @@ class TextNormalizationDecoderDataset(Dataset):
             if initial_shuffle:
                 random.shuffle(raw_instances)
 
-            logging.info(f"Converting raw instances to DecoderDataInstance for {input_file}...")
+            logging.debug(f"Converting raw instances to DecoderDataInstance for {input_file}...")
             self.insts, all_semiotic_classes = self.__process_raw_entries(
                 raw_instances, decoder_data_augmentation=decoder_data_augmentation
             )
-            logging.info(
+            logging.debug(
                 f"Extracted {len(self.insts)} DecoderDateInstances out of {len(raw_instances)} raw instances."
             )
             self.label_ids_semiotic = OrderedDict({l: idx for idx, l in enumerate(all_semiotic_classes)})
@@ -203,7 +203,6 @@ class TextNormalizationDecoderDataset(Dataset):
             input_len = len(_input['input_ids'][0])
             if input_len > self.max_seq_len:
                 long_examples_filtered += 1
-                input_max_len = max(input_max_len, input_len)
                 continue
 
             # Target
@@ -211,7 +210,6 @@ class TextNormalizationDecoderDataset(Dataset):
             target_len = len(_target['input_ids'][0])
             if target_len > self.max_seq_len:
                 long_examples_filtered += 1
-                target_max_len = max(target_max_len, target_len)
                 continue
 
             # Update
@@ -226,8 +224,9 @@ class TextNormalizationDecoderDataset(Dataset):
                 self.tn_count += 1
             if inputs[idx].startswith(constants.ITN_PREFIX):
                 self.itn_count += 1
-
-        logging.info(f'long_examples_filtered: {long_examples_filtered} based on max_seq_len: {self.max_seq_len}')
+            input_max_len = max(input_max_len, input_len)
+            target_max_len = max(target_max_len, target_len)
+        logging.info(f'long_examples_filtered: {long_examples_filtered}')
         logging.info(f'input_max_len: {input_max_len} | target_max_len: {target_max_len}')
 
         # we need to pad input_center, so we first collect all values, and then batch_tokenize with padding
@@ -412,14 +411,8 @@ class DecoderDataInstance:
             input_words = [constants.ITN_PREFIX] + s_input
             output_words = c_w_words
         if inst_dir == constants.INST_FORWARD:
-            if semiotic_class == 'DATE':
-                PREFIX = '2'
-            elif semiotic_class == 'FRACTION':
-                PREFIX = '3'
-            else:
-                PREFIX = constants.TN_PREFIX
             input_center_words = c_w_words
-            input_words = [PREFIX] + w_input
+            input_words = [constants.TN_PREFIX] + w_input
             output_words = c_s_words
         # Finalize
         self.input_str = ' '.join(input_words)

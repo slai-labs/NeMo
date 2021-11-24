@@ -217,7 +217,7 @@ class TextNormalizationTestDataset:
             span_ends: A list of lists where inner list contains the end word index of the current token
         Return: the class accuracy scores as dict
         """
-        error_f = open("error_per_class.txt", 'w+')
+
         if len(targets) == 0:
             return 'NA'
         class2stats, class2correct = defaultdict(int), defaultdict(int)
@@ -260,19 +260,9 @@ class TextNormalizationTestDataset:
                     " ".join(cur_words[class_idx]), targets[ix][target_token_idx], inst_directions[ix]
                 )
                 class2correct[classes[ix][class_idx]] += correct
-                if not correct:
-                    class_str = classes[ix][class_idx]
-                    span_start = max(class_idx - 1, 0)
-                    center = " ".join(sent[span_ends[ix][span_start] : span_ends[ix][class_idx]])
-                    print(center)
-                    error_f.write(f"{class_str}\tInput\tFULL\n")
-                    error_f.write(f"{class_str}\tCente\t{center}\n")
-                    error_f.write(f"{class_str}\tPREDI\t{' '.join(cur_words[class_idx])}\n")
-                    error_f.write(f"{class_str}\tTARGE\t{targets[ix][target_token_idx]}\n")
-                    error_f.write('\n')
                 target_token_idx += 1
 
         for key in class2stats:
             class2stats[key] = (class2correct[key] / class2stats[key], class2correct[key], class2stats[key])
-        error_f.close()
+
         return class2stats

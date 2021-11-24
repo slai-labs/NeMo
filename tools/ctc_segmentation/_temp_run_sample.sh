@@ -27,38 +27,37 @@ do
     fi
 done
 
-#echo "MODEL_NAME_OR_PATH = $MODEL_NAME_OR_PATH"
-#echo "DATA_DIR = $DATA_DIR"
-#echo "OUTPUT_DIR = $OUTPUT_DIR"
-#echo "MIN_SCORE = $MIN_SCORE"
-#echo "CUT_PREFIX = $CUT_PREFIX"
-#echo "SCRIPTS_DIR = $SCRIPTS_DIR"
-#echo "OFFSET = $OFFSET"
-#echo "LANGUAGE = $LANGUAGE"
-#echo "MIN_SEGMENT_LEN = $MIN_SEGMENT_LEN"
-#echo "MAX_SEGMENT_LEN = $MAX_SEGMENT_LEN"
-#echo "ADDITIONAL_SPLIT_SYMBOLS = $ADDITIONAL_SPLIT_SYMBOLS"
-#echo "USE_NEMO_NORMALIZATION = $USE_NEMO_NORMALIZATION"
-#
-##if [[ -z $MODEL_NAME_OR_PATH ]] || [[ -z $DATA_DIR ]] || [[ -z $OUTPUT_DIR ]]; then
-##  echo "Usage: $(basename "$0")
-##  --MODEL_NAME_OR_PATH=[model_name_or_path]
-##  --DATA_DIR=[data_dir]
-##  --OUTPUT_DIR=[output_dir]
-##  --LANGUAGE=[language (Optional)]
-##  --OFFSET=[offset value (Optional)]
-##  --CUT_PREFIX=[cut prefix in sec (Optional)]
-##  --SCRIPTS_DIR=[scripts_dir_path (Optional)]
-##  --MIN_SEGMENT_LEN=[min number of characters of the text segment for alignment (Optional)]
-##  --MAX_SEGMENT_LEN=[max number of characters of the text segment for alignment (Optional)]
-##  --ADDITIONAL_SPLIT_SYMBOLS=[Additional symbols to use for
-##    sentence split if eos sentence split resulted in sequence longer than --max_length.
-##    Use '|' as a separator between symbols, for example: ';|:' (Optional)]
-##  --AUDIO_FORMAT=[choose from ['.mp3', '.wav'], input audio files format
-##  --USE_NEMO_NORMALIZATION Set to 'True' to use NeMo Normalization tool to convert
-##    numbers from written to spoken format. By default num2words package will be used. (Optional)"
-##  exit 1
-##fi
+echo "MODEL_NAME_OR_PATH = $MODEL_NAME_OR_PATH"
+echo "DATA_DIR = $DATA_DIR"
+echo "OUTPUT_DIR = $OUTPUT_DIR"
+echo "MIN_SCORE = $MIN_SCORE"
+echo "CUT_PREFIX = $CUT_PREFIX"
+echo "SCRIPTS_DIR = $SCRIPTS_DIR"
+echo "OFFSET = $OFFSET"
+echo "LANGUAGE = $LANGUAGE"
+echo "MIN_SEGMENT_LEN = $MIN_SEGMENT_LEN"
+echo "MAX_SEGMENT_LEN = $MAX_SEGMENT_LEN"
+echo "ADDITIONAL_SPLIT_SYMBOLS = $ADDITIONAL_SPLIT_SYMBOLS"
+echo "USE_NEMO_NORMALIZATION = $USE_NEMO_NORMALIZATION"
+
+if [[ -z $MODEL_NAME_OR_PATH ]] || [[ -z $DATA_DIR ]] || [[ -z $OUTPUT_DIR ]]; then
+  echo "Usage: $(basename "$0")
+  --MODEL_NAME_OR_PATH=[model_name_or_path]
+  --DATA_DIR=[data_dir]
+  --OUTPUT_DIR=[output_dir]
+  --LANGUAGE=[language (Optional)]
+  --OFFSET=[offset value (Optional)]
+  --CUT_PREFIX=[cut prefix in sec (Optional)]
+  --SCRIPTS_DIR=[scripts_dir_path (Optional)]
+  --MAX_SEGMENT_LEN=[max number of characters of the text segment for alignment (Optional)]
+  --ADDITIONAL_SPLIT_SYMBOLS=[Additional symbols to use for
+    sentence split if eos sentence split resulted in sequence longer than --max_length.
+    Use '|' as a separator between symbols, for example: ';|:' (Optional)]
+  --AUDIO_FORMAT=[choose from ['.mp3', '.wav'], input audio files format
+  --USE_NEMO_NORMALIZATION Set to 'True' to use NeMo Normalization tool to convert
+    numbers from written to spoken format. By default num2words package will be used. (Optional)"
+  exit 1
+fi
 
 NEMO_NORMALIZATION=""
     if [[ ${USE_NEMO_NORMALIZATION,,} == "true" ]]; then
