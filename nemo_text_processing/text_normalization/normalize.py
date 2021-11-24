@@ -18,7 +18,7 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 from typing import List
 
-from nemo_text_processing.text_normalization.data_loader_utils import post_process_punctuation, pre_process
+from nemo_text_processing.text_normalization.data_loader_utils import pre_process
 from nemo_text_processing.text_normalization.token_parser import PRESERVE_ORDER_KEY, TokenParser
 from tqdm import tqdm
 
@@ -31,6 +31,7 @@ except (ModuleNotFoundError, ImportError):
 
 try:
     from nemo.collections.common.tokenizers.moses_tokenizers import MosesProcessor
+    from nemo.collections.nlp.data.text_normalization.utils import post_process_punct
 
     NLP_AVAILABLE = True
 except (ModuleNotFoundError, ImportError):
@@ -94,7 +95,9 @@ class Normalizer:
             self.processor = None
             print("NeMo NLP is not available. Moses de-tokenization will be skipped.")
 
-    def normalize_list(self, texts: List[str], verbose=False) -> List[str]:
+    def normalize_list(
+        self, texts: List[str], verbose=False, punct_pre_process: bool = False, punct_post_process: bool = False
+    ) -> List[str]:
         """
         NeMo text normalizer 
 
@@ -107,7 +110,9 @@ class Normalizer:
         res = []
         for input in tqdm(texts):
             try:
-                text = self.normalize(input, verbose=verbose)
+                text = self.normalize(
+                    input, verbose=verbose, punct_pre_process=punct_pre_process, punct_post_process=punct_post_process
+                )
             except:
                 print(input)
                 raise Exception
@@ -152,10 +157,12 @@ class Normalizer:
                 continue
             output = self.select_verbalizer(verbalizer_lattice)
             if punct_post_process:
-                output = post_process_punctuation(output)
                 # do post-processing based on Moses detokenizer
                 if self.processor:
-                    output = self.processor.detokenize([output])
+                    output = self.processor.moses_detokenizer.detokenize([output], unescape=False)
+                    output = post_process_punct(text, output)
+                else:
+                    print("NEMO_NLP collection is not available: skipping punctuation post_processing")
             return output
         raise ValueError()
 
