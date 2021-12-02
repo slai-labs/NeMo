@@ -1,3 +1,7 @@
+# #  abcdefghijklmnopqrstuvwxyzɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁ ǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞̴̥̤̪̬̰̺̼̻̹̜̟̠̊̃̈̚ɫ̝̩̞̯̘̙̽̆̋́̄̀̏͜͡↓↑→
+# # /usr/local/lib/python3.7/dist-packages/nemo/collections/common/data/vocabs.py
+
+
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -214,38 +218,48 @@ class Base(abc.ABC):
         return self.sep.join(self._id2label[t] for t in tokens if t not in self._util_ids)
 
 
+
 class Chars(Base):
     """Chars vocabulary."""
-
+    
     def __init__(
         self, punct=True, spaces=False, apostrophe=True, add_blank_at="last_but_one",
     ):
-        labels = []
-        self.space, labels = len(labels), labels + [' ']  # Space
-        labels.extend(string.ascii_lowercase)
-        if apostrophe:
-            labels.append("'")  # Apostrophe for saving "don't" and "Joe's"
+        labels = list(" abcdefghijklmnopqrstuvwxyzɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞̴̥̤̪̬̰̺̼̻̹̜̟̠̊̃̈̚ɫ̝̩̞̯̘̙̽̆̋́̄̀̏͜͡↓↑→")        
+        self.space = 0
 
-        if punct:
-            labels.extend(self.PUNCT)
+        # self.space, labels = len(labels), labels + [' ']  # Space
+        # labels.extend(string.ascii_lowercase)
+        # if apostrophe:
+        #     labels.append("'")  # Apostrophe for saving "don't" and "Joe's"
+
+        # if punct:
+        #     labels.extend(self.PUNCT)
 
         super().__init__(labels, add_blank_at=add_blank_at)
 
         self.punct = punct
         self.spaces = spaces
 
-        self._parser = parsers.ENCharParser(labels)
+        # self._parser = parsers.ENCharParser(labels)
+        self._parser = parsers.make_parser(labels=labels,unk_id= -1,
+                        blank_id = -1,
+                        do_normalize = False,
+                        do_lowercase = False,
+                        do_tokenize = True)
 
     def encode(self, text):
         """See base class."""
-        text = self._parser._normalize(text)  # noqa
+        # text = self._parser._normalize(text)  # noqa
 
-        if self.spaces:
-            for p in set(text) & set(self.PUNCT):
-                text = text.replace(p, f' {p} ')
-            text = text.strip().replace('  ', ' ')
+        # if self.spaces:
+        #     for p in set(text) & set(self.PUNCT):
+        #         text = text.replace(p, f' {p} ')
+        #     text = text.strip().replace('  ', ' ')
 
         return self._parser._tokenize(text)  # noqa
+
+
 
 
 class Phonemes(Base):
