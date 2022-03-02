@@ -225,7 +225,7 @@ class Chars(Base):
     def __init__(
         self, punct=True, spaces=False, apostrophe=True, add_blank_at="last_but_one",
     ):
-        labels = list(" abcdefghijklmnopqrstuvwxyzɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞̴̥̤̪̬̰̺̼̻̹̜̟̠̊̃̈̚ɫ̝̩̞̯̘̙̽̆̋́̄̀̏͜͡↓↑→")        
+        labels=list(''' _-!'(),.:;?”।“"ᴪ̌ʘᴄʼɒɤʁᵾʌʐᴠᴥ̰ˤᴂᴚᵉᴋᵿʷ̩᷄̀ɰɛɺʱɧgʋʏ↓p̄ʊᴈᵍᵖœ̴̯ɶɾɥrꜜʤ˨ǀʉ̜↗̠̹ⱱi̥̞̤ɚᴔˈᵷɢəɠ˦ᵳʍʑŋuχθᴛæᵈᴧbˑ̼́ɐ̙ːɓᵴβᴟɮʒmɦɽⁿ˥ᵹɳᴞɸksɔn̪ǂʂᵼʙʜˡ᷈yʧʄʎᵮɹᵗ̟ᵻʡᴣɟᴃʴᵫɡjᴊᵣxˌʰᴏl̏̃ɪᴍᴩðᴅᵯᵭɫᴫ˞ɻɴʢᴨvǃ̋foᵱɱhᵊᵘ‿ɣᵵʃ̬͡ħ̈ɬɞ̺̊ɭ͜ᴙʈ᷅ʟˠ̘ʀaeᴝ̆ꜛᵐ↘ʝᴡᴇᵇʔǁʲ◌ᵒᴕ↑ᴘɯzᴁɖᴆ˧çᵛ̚ᵃᵲɕʛᵬ̻ᴢʕᴀᵽɜdwᵰ.̽qt‖̂ɗøᴤɨɑcɝᴦ̝ɘᴜᵺᵶɵᵏ˩ɲ→''') #final
         self.space = 0
 
         # self.space, labels = len(labels), labels + [' ']  # Space
