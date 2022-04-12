@@ -225,7 +225,8 @@ class Chars(Base):
     def __init__(
         self, punct=True, spaces=False, apostrophe=True, add_blank_at="last_but_one",
     ):
-        labels=list(''' _-!'(),.:;?”।“"ᴪ̌ʘᴄʼɒɤʁᵾʌʐᴠᴥ̰ˤᴂᴚᵉᴋᵿʷ̩᷄̀ɰɛɺʱɧgʋʏ↓p̄ʊᴈᵍᵖœ̴̯ɶɾɥrꜜʤ˨ǀʉ̜↗̠̹ⱱi̥̞̤ɚᴔˈᵷɢəɠ˦ᵳʍʑŋuχθᴛæᵈᴧbˑ̼́ɐ̙ːɓᵴβᴟɮʒmɦɽⁿ˥ᵹɳᴞɸksɔn̪ǂʂᵼʙʜˡ᷈yʧʄʎᵮɹᵗ̟ᵻʡᴣɟᴃʴᵫɡjᴊᵣxˌʰᴏl̏̃ɪᴍᴩðᴅᵯᵭɫᴫ˞ɻɴʢᴨvǃ̋foᵱɱhᵊᵘ‿ɣᵵʃ̬͡ħ̈ɬɞ̺̊ɭ͜ᴙʈ᷅ʟˠ̘ʀaeᴝ̆ꜛᵐ↘ʝᴡᴇᵇʔǁʲ◌ᵒᴕ↑ᴘɯzᴁɖᴆ˧çᵛ̚ᵃᵲɕʛᵬ̻ᴢʕᴀᵽɜdwᵰ.̽qt‖̂ɗøᴤɨɑcɝᴦ̝ɘᴜᵺᵶɵᵏ˩ɲ→''') #final
+#         labels=list(''' _-!'(),.:;?”।“"ᴪ̌ʘᴄʼɒɤʁᵾʌʐᴠᴥ̰ˤᴂᴚᵉᴋᵿʷ̩᷄̀ɰɛɺʱɧgʋʏ↓p̄ʊᴈᵍᵖœ̴̯ɶɾɥrꜜʤ˨ǀʉ̜↗̠̹ⱱi̥̞̤ɚᴔˈᵷɢəɠ˦ᵳʍʑŋuχθᴛæᵈᴧbˑ̼́ɐ̙ːɓᵴβᴟɮʒmɦɽⁿ˥ᵹɳᴞɸksɔn̪ǂʂᵼʙʜˡ᷈yʧʄʎᵮɹᵗ̟ᵻʡᴣɟᴃʴᵫɡjᴊᵣxˌʰᴏl̏̃ɪᴍᴩðᴅᵯᵭɫᴫ˞ɻɴʢᴨvǃ̋foᵱɱhᵊᵘ‿ɣᵵʃ̬͡ħ̈ɬɞ̺̊ɭ͜ᴙʈ᷅ʟˠ̘ʀaeᴝ̆ꜛᵐ↘ʝᴡᴇᵇʔǁʲ◌ᵒᴕ↑ᴘɯzᴁɖᴆ˧çᵛ̚ᵃᵲɕʛᵬ̻ᴢʕᴀᵽɜdwᵰ.̽qt‖̂ɗøᴤɨɑcɝᴦ̝ɘᴜᵺᵶɵᵏ˩ɲ→''') #final
+        labels=list(' abcdefghijklmnopqrstuvwxyzɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞̴̥̤̪̬̰̺̼̻̹̜̟̠̊̃̈̚ɫ̝̩̞̯̘̙̽̆̋́̄̀̏͜͡↓↑→“)"?,(।;:ᵻ!.”')
         self.space = 0
 
         # self.space, labels = len(labels), labels + [' ']  # Space
@@ -238,8 +239,8 @@ class Chars(Base):
 
         super().__init__(labels, add_blank_at=add_blank_at)
 
-        self.punct = punct
-        self.spaces = spaces
+        self.punct = False
+        self.spaces = False
 
         # self._parser = parsers.ENCharParser(labels)
         self._parser = parsers.make_parser(labels=labels,unk_id= -1,
